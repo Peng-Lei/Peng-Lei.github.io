@@ -28,7 +28,7 @@
 <meta property="og:description" content="Spark源码分析系列是自己在学习Spark过程中的总结和记录，基于Spark3.0版本，一共分为三个子系列">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2021-03-23T06:15:57.830Z">
-<meta property="article:modified_time" content="2021-03-23T06:15:16.030Z">
+<meta property="article:modified_time" content="2021-03-23T07:33:45.400Z">
 <meta property="article:author" content="Peng Lei">
 <meta property="article:tag" content="spark">
 <meta name="twitter:card" content="summary">
@@ -218,7 +218,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2021-03-23 14:15:57 / 修改时间：14:15:16" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
+              <time title="创建时间：2021-03-23 14:15:57 / 修改时间：15:33:45" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -243,7 +243,7 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>230</span>
+              <span>257</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -262,28 +262,34 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h2 id=""><a href="#" class="headerlink" title=""></a></h2><p>Spark源码分析系列是自己在学习Spark过程中的总结和记录，基于Spark3.0版本，一共分为三个子系列</p>
+        <p>Spark源码分析系列是自己在学习Spark过程中的总结和记录，基于Spark3.0版本，一共分为三个子系列</p>
 <a id="more"></a>
 
 <ul>
 <li>Spark基础系列</li>
 <li>Spark On K8S系列</li>
-<li>Spark Application执行过程系列</li>
+<li>Spark Application系列</li>
 </ul>
-<h2 id="Spark基础系列"><a href="#Spark基础系列" class="headerlink" title="Spark基础系列"></a>Spark基础系列</h2><h2 id="Spark-On-K8S系列"><a href="#Spark-On-K8S系列" class="headerlink" title="Spark On K8S系列"></a>Spark On K8S系列</h2><h2 id="Spark-Application执行过程系列"><a href="#Spark-Application执行过程系列" class="headerlink" title="Spark Application执行过程系列"></a>Spark Application执行过程系列</h2><h2 id="约定"><a href="#约定" class="headerlink" title="约定"></a>约定</h2><p>categories：</p>
-<ul>
-<li>Spark</li>
-<li>Spark基础系列</li>
-<li>Spark On K8S系列</li>
-<li>Spark Application执行过程系列</li>
+<h2 id="Spark基础系列"><a href="#Spark基础系列" class="headerlink" title="Spark基础系列"></a>Spark基础系列</h2><ul>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-1/">1</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-2/">2</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-3/">3</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-4/">4</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-5/">5</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-6/">6</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-7/">7</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-8/">8</a></li>
 </ul>
-<p>tags：</p>
-<ul>
-<li>spark</li>
-<li>spark-core</li>
-<li>spark-k8s</li>
+<h2 id="Spark-On-K8S系列"><a href="#Spark-On-K8S系列" class="headerlink" title="Spark On K8S系列"></a>Spark On K8S系列</h2><ul>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-1/">Spark on K8S</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-2/">Spark on K8S Submit分析</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-3/">Spark on K8S Feature分析</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-4/">Spark on K8S Scheduler分析</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-5/">Spark on K8S Shuffle分析</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-6/">Spark on K8S 运行流程</a></li>
+<li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-7/">Spark on K8S Demo尝试</a></li>
 </ul>
-
+<h2 id="Spark-Application系列"><a href="#Spark-Application系列" class="headerlink" title="Spark Application系列"></a>Spark Application系列</h2>
     </div>
 
     
@@ -321,12 +327,12 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-7/" rel="prev" title="Spark MemoryManager">
-      <i class="fa fa-chevron-left"></i> Spark MemoryManager
+    <a href="/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-8/" rel="prev" title="Spark DAGScheduler">
+      <i class="fa fa-chevron-left"></i> Spark DAGScheduler
     </a></div>
       <div class="post-nav-item">
-    <a href="/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-8/" rel="next" title="Spark DAGScheduler">
-      Spark DAGScheduler <i class="fa fa-chevron-right"></i>
+    <a href="/2021/03/23/WSL2/WSL2%E4%BD%9C%E4%B8%BADocker%E5%90%8E%E7%AB%AF/" rel="next" title="WSL2作为Docker后端">
+      WSL2作为Docker后端 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -387,7 +393,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link"><span class="nav-number">1.</span> <span class="nav-text"></span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Spark%E5%9F%BA%E7%A1%80%E7%B3%BB%E5%88%97"><span class="nav-number">2.</span> <span class="nav-text">Spark基础系列</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Spark-On-K8S%E7%B3%BB%E5%88%97"><span class="nav-number">3.</span> <span class="nav-text">Spark On K8S系列</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Spark-Application%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B%E7%B3%BB%E5%88%97"><span class="nav-number">4.</span> <span class="nav-text">Spark Application执行过程系列</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%A6%E5%AE%9A"><span class="nav-number">5.</span> <span class="nav-text">约定</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Spark%E5%9F%BA%E7%A1%80%E7%B3%BB%E5%88%97"><span class="nav-number">1.</span> <span class="nav-text">Spark基础系列</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Spark-On-K8S%E7%B3%BB%E5%88%97"><span class="nav-number">2.</span> <span class="nav-text">Spark On K8S系列</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Spark-Application%E7%B3%BB%E5%88%97"><span class="nav-number">3.</span> <span class="nav-text">Spark Application系列</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -403,20 +409,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">22</span>
+          <span class="site-state-item-count">19</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-count">5</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-count">5</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -457,12 +463,12 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">57k</span>
+    <span title="站点总字数">47k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">52 分钟</span>
+    <span title="站点阅读时长">42 分钟</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
   </div>
