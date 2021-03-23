@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"www.mobanche.top","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"./public/search.xml"};
+  </script>
+
+  <meta name="description" content="概述Shuffle过程是进行数据洗牌的过程，由于涉及到了磁盘IO、数据序列化于反序列化、网络IO，所以Shuffle过程是一个非常消耗资源的过程，所以对Shuffle有优化会对大数据计算框架带来显著的性能提升。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark之Shuffle">
+<meta property="og:url" content="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-6/index.html">
+<meta property="og:site_name" content="末班车">
+<meta property="og:description" content="概述Shuffle过程是进行数据洗牌的过程，由于涉及到了磁盘IO、数据序列化于反序列化、网络IO，所以Shuffle过程是一个非常消耗资源的过程，所以对Shuffle有优化会对大数据计算框架带来显著的性能提升。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image005.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image006.png">
+<meta property="article:published_time" content="2021-03-23T06:15:57.810Z">
+<meta property="article:modified_time" content="2021-03-23T06:15:16.030Z">
+<meta property="article:author" content="Peng Lei">
+<meta property="article:tag" content="spark">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://www.mobanche.top/images/spark/image005.png">
+
+<link rel="canonical" href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-6/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Spark之Shuffle | 末班车</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">末班车</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/me.jpg">
+      <meta itemprop="name" content="Peng Lei">
+      <meta itemprop="description" content="壁立千仞.无欲则刚">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="末班车">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Spark之Shuffle
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-03-23 14:15:57 / 修改时间：14:15:16" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Spark%E5%9F%BA%E7%A1%80%E7%B3%BB%E5%88%97/" itemprop="url" rel="index"><span itemprop="name">Spark基础系列</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>5.9k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>5 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Shuffle过程是进行数据洗牌的过程，由于涉及到了磁盘IO、数据序列化于反序列化、网络IO，所以Shuffle过程是一个非常消耗资源的过程，所以对Shuffle有优化会对大数据计算框架带来显著的性能提升。</p>
+<a id="more"></a>
+
+<p>Shuffle分为write和read两种操作，Map阶段（shuffle write）会将Map Task的结果数据写入到特定地方，比如内存、Disk、第三方存储介质、或者直接push到reduce 端。Reduce阶段（shuffle read）从固定的地方读取数据（前面shuffle write的数据）。</p>
+<h2 id="Shuffle历史"><a href="#Shuffle历史" class="headerlink" title="Shuffle历史"></a>Shuffle历史</h2><p>Spark V1.1 之前使用的是Hash base shuffle</p>
+<p>Spark V1.1 之后使用的是Sort base shuffle</p>
+<p>Spark V1.6 之后Tungsten Sort并入Sort base shuffle</p>
+<p>Spark V2.0 废弃Hash base shuffle</p>
+<p>关于Spark Shuffle 网上有非常多的资料介绍Hash base shuffle以及各种Shuffle机制。由于目前Spark（V3.0）只有Sort base shuffle，所以本文只介绍Sort base shuffle，摒弃过时的分析，减少各类对比，专注目前Spark shuffle的实现。</p>
+<h2 id="ShuffleManager"><a href="#ShuffleManager" class="headerlink" title="ShuffleManager"></a>ShuffleManager</h2><p>一段来自代码的注释：</p>
+<p><em>“ Pluggable interface for shuffle systems. A ShuffleManager is created in SparkEnv on the driver and on each executor, based on the spark.shuffle.manager setting. The driver registers shuffles with it, and executors (or tasks running locally in the driver) can ask to read and write data. ”</em></p>
+<p>这个接口比较简单</p>
+<p><img src="/images/spark/image005.png"></p>
+<p>NOTE:</p>
+<ol>
+<li>This will be instantiated by SparkEnv so its constructor can take a SparkConf and boolean isDriver as parameters.</li>
+<li>This contains a method ShuffleBlockResolver which interacts with External Shuffle Service when it is enabled. Need to pay attention to that, if implementing a custom ShuffleManager, to make sure the custom ShuffleManager could co-exist with External Shuffle Service.</li>
+</ol>
+<h2 id="SortShuffleManager"><a href="#SortShuffleManager" class="headerlink" title="SortShuffleManager"></a>SortShuffleManager</h2><p>ShuffleManager的唯一实现SortShuffleManager</p>
+<p><img src="/images/spark/image006.png"></p>
+<p>最核心的三个操作：</p>
+<ol>
+<li>getWriter（获取Shuffle write的执行器，不同的执行器性能、使用场景、使用条件都不一样）</li>
+<li>getReader （获取Shuffle read的执行器）</li>
+<li>ShuffleBlockResolver-&gt;IndexShuffleBlockResolver （跟External Shuffle Service交互的组件，当然了这个必须是使用了External Shuffle Service的条件下）</li>
+</ol>
+<h3 id="Shuffle-Write"><a href="#Shuffle-Write" class="headerlink" title="Shuffle Write"></a>Shuffle Write</h3><p><em>“Obtained inside a map task to write out records to the shuffle system.”</em></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">private[spark] abstract class ShuffleWriter[K, V] &#123;</span><br><span class="line">  &#x2F;** Write a sequence of records to this task&#39;s output *&#x2F;</span><br><span class="line">  @throws[IOException]</span><br><span class="line">  def write(records: Iterator[Product2[K, V]]): Unit</span><br><span class="line"></span><br><span class="line">  &#x2F;** Close this writer, passing along whether the map completed *&#x2F;</span><br><span class="line">  def stop(success: Boolean): Option[MapStatus]</span><br><span class="line"></span><br><span class="line">  &#x2F;** Get the lengths of each partition *&#x2F;</span><br><span class="line">  def getPartitionLengths(): Array[Long]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>目前Shuffle write一种有三种</p>
+<ul>
+<li>SortShuffleWriter</li>
+<li>BypassMergeSortShuffleWriter</li>
+<li>UnsafeShuffleWriter</li>
+</ul>
+<p>我们依次分析三种writer的write方法，总结不同之处。</p>
+<h4 id="SortShuffleWriter"><a href="#SortShuffleWriter" class="headerlink" title="SortShuffleWriter"></a>SortShuffleWriter</h4><p>重点分析write方法，代码有精简</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">sorter &#x3D; new ExternalSorter[K, V, C]()</span><br><span class="line"></span><br><span class="line">sorter.insertAll(records)</span><br><span class="line"></span><br><span class="line">val mapOutputWriter &#x3D; shuffleExecutorComponents.createMapOutputWriter(</span><br><span class="line">      dep.shuffleId, mapId, dep.partitioner.numPartitions)</span><br><span class="line">    </span><br><span class="line">sorter.writePartitionedMapOutput(dep.shuffleId, mapId, mapOutputWriter)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<ol>
+<li>创建ExternalSorter类型的sorter对象</li>
+<li>调入insertAll方法写入records</li>
+<li>创建mapOutputWriter</li>
+<li>写入结果数据</li>
+</ol>
+<p>所以对于SortShuffleWriter来说，最重要的ExternalSorter类型的sorter对象。关于它，后续专门分析。</p>
+<h4 id="BypassMergeSortShuffleWriter"><a href="#BypassMergeSortShuffleWriter" class="headerlink" title="BypassMergeSortShuffleWriter"></a>BypassMergeSortShuffleWriter</h4><p>重点分析write方法，代码有精简</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line">@Override</span><br><span class="line">public void write(Iterator&lt;Product2&lt;K, V&gt;&gt; records) throws IOException &#123;</span><br><span class="line">  ...</span><br><span class="line">  ShuffleMapOutputWriter mapOutputWriter &#x3D; shuffleExecutorComponents</span><br><span class="line">      .createMapOutputWriter(shuffleId, mapId, numPartitions);</span><br><span class="line">  try &#123;</span><br><span class="line">    ...</span><br><span class="line">    final SerializerInstance serInstance &#x3D; serializer.newInstance();</span><br><span class="line">    final long openStartTime &#x3D; System.nanoTime();</span><br><span class="line">    </span><br><span class="line">    partitionWriters &#x3D; new DiskBlockObjectWriter[numPartitions];</span><br><span class="line">    partitionWriterSegments &#x3D; new FileSegment[numPartitions];</span><br><span class="line">    </span><br><span class="line">    for (int i &#x3D; 0; i &lt; numPartitions; i++) &#123;</span><br><span class="line">      ...</span><br><span class="line">      &#x2F;&#x2F;对每个Partitition创建临时文件和DiskBlockObjectWriter</span><br><span class="line">      final File file &#x3D; tempShuffleBlockIdPlusFile._2();</span><br><span class="line">      partitionWriters[i] &#x3D;</span><br><span class="line">          blockManager.getDiskWriter(blockId, file, serInstance, fileBufferSize, writeMetrics);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;写数据</span><br><span class="line">    while (records.hasNext()) &#123;</span><br><span class="line">      final Product2&lt;K, V&gt; record &#x3D; records.next();</span><br><span class="line">      final K key &#x3D; record._1();</span><br><span class="line">      partitionWriters[partitioner.getPartition(key)].write(key, record._2());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    for (int i &#x3D; 0; i &lt; numPartitions; i++) &#123;</span><br><span class="line">      try (DiskBlockObjectWriter writer &#x3D; partitionWriters[i]) &#123;</span><br><span class="line">        partitionWriterSegments[i] &#x3D; writer.commitAndGet();</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    &#x2F;&#x2F;文件进行了合并</span><br><span class="line">    partitionLengths &#x3D; writePartitionedData(mapOutputWriter);</span><br><span class="line">    </span><br><span class="line">    mapStatus &#x3D; MapStatus$.MODULE$.apply(</span><br><span class="line">      blockManager.shuffleServerId(), partitionLengths, mapId);</span><br><span class="line">  &#125; catch (Exception e) &#123;</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol>
+<li>创建ShuffleMapOutputWriter类型的mapOutputWriter</li>
+<li>针对每个Partition创建临时文件和DiskBlockObjectWriter</li>
+<li>写入所有record</li>
+<li>把所有的临时文件用mapOutputWriter合并，并删除临时文件</li>
+</ol>
+<h4 id="UnsafeShuffleWriter"><a href="#UnsafeShuffleWriter" class="headerlink" title="UnsafeShuffleWriter"></a>UnsafeShuffleWriter</h4><p>重点分析write方法</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">@Override</span><br><span class="line">public void write(scala.collection.Iterator&lt;Product2&lt;K, V&gt;&gt; records) throws IOException   &#123;</span><br><span class="line">  ...</span><br><span class="line">  boolean success &#x3D; false;</span><br><span class="line">  try &#123;</span><br><span class="line">    while (records.hasNext()) &#123;</span><br><span class="line">      insertRecordIntoSorter(records.next());</span><br><span class="line">    &#125;</span><br><span class="line">    &#x2F;&#x2F;数据最后merge一把，同时生成索引文件</span><br><span class="line">    closeAndWriteOutput();</span><br><span class="line">    success &#x3D; true;</span><br><span class="line">  &#125; finally &#123;</span><br><span class="line">    sorter.cleanupResources();</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol>
+<li>insertRecordIntoSorter,所有record写入sorter</li>
+<li>closeAndWriteOutput</li>
+<li>修改标记</li>
+</ol>
+<p>insertRecordIntoSorter：将数据写入到排序器中</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">void insertRecordIntoSorter(Product2&lt;K, V&gt; record) throws IOException &#123;</span><br><span class="line">  ...</span><br><span class="line">  serBuffer.reset();</span><br><span class="line">  serOutputStream.writeKey(key, OBJECT_CLASS_TAG);</span><br><span class="line">  serOutputStream.writeValue(record._2(), OBJECT_CLASS_TAG);</span><br><span class="line">  serOutputStream.flush();</span><br><span class="line"></span><br><span class="line">  final int serializedRecordSize &#x3D; serBuffer.size();</span><br><span class="line">  ...</span><br><span class="line">  sorter.insertRecord(</span><br><span class="line">    serBuffer.getBuf(), Platform.BYTE_ARRAY_OFFSET, serializedRecordSize, partitionId);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>closeAndWriteOutput: 将所有的临时文件合并成一个文件</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">void closeAndWriteOutput() throws IOException &#123;</span><br><span class="line">  ...</span><br><span class="line">  try &#123;</span><br><span class="line">    partitionLengths &#x3D; mergeSpills(spills);</span><br><span class="line">  &#125; finally &#123;</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">  mapStatus &#x3D; MapStatus$.MODULE$.apply(</span><br><span class="line">    blockManager.shuffleServerId(), partitionLengths, mapId);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><p>SortShuffleWriter包含ExternalSorter、ShuffleMapOutputWriter</p>
+<p>BypassMergeSortShuffleWriter包含ShuffleMapOutputWriter，没有sorter排序器</p>
+<p>UnsafeShuffleWriter包含ShuffleExternalSorter，没有ShuffleMapOutputWriter但是通过ShuffleBlockResolver生成了索引文件。</p>
+<p>三种writer的写入机制不同，使用场景和条件不同，但是最终都会有临时文件的合并操作，合并成一个文件，同时又mapStatus状态的统计、partitionLengths的统计等。</p>
+<h3 id="Shuffle-Read"><a href="#Shuffle-Read" class="headerlink" title="Shuffle Read"></a>Shuffle Read</h3><p>来自代码的注释</p>
+<p><em>“Obtained inside a reduce task to read combined records from the mappers.”</em></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">private[spark] trait ShuffleReader[K, C] &#123;</span><br><span class="line">  &#x2F;** Read the combined key-values for this reduce task *&#x2F;</span><br><span class="line">  def read(): Iterator[Product2[K, C]]</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; def stop(): Unit</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在目前的Shuffle的实现中，只有一种Shuffle Reader，即：BlockStoreShuffleReader</p>
+<h4 id="BlockStoreShuffleReader"><a href="#BlockStoreShuffleReader" class="headerlink" title="BlockStoreShuffleReader"></a>BlockStoreShuffleReader</h4><p>来自代码的注释</p>
+<p><em>“Fetches and reads the blocks from a shuffle by requesting them from other nodes’ block stores.”</em></p>
+<p>TODO</p>
+<h3 id="ShuffleBlockResolver"><a href="#ShuffleBlockResolver" class="headerlink" title="ShuffleBlockResolver"></a>ShuffleBlockResolver</h3><p>TODO</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a target="_blank" rel="noopener" href="https://github.com/apache/spark">Spark代码</a></p>
+
+    </div>
+
+    
+    
+    
+        <div class="reward-container">
+  <div>您的支持将鼓励我继续创作.</div>
+  <button onclick="var qr = document.getElementById('qr'); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
+    打赏
+  </button>
+  <div id="qr" style="display: none;">
+      
+      <div style="display: inline-block;">
+        <img src="/images/pay/01.jpg" alt="Peng Lei 微信支付">
+        <p>微信支付</p>
+      </div>
+      
+      <div style="display: inline-block;">
+        <img src="/images/pay/02.jpg" alt="Peng Lei 支付宝">
+        <p>支付宝</p>
+      </div>
+
+  </div>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/spark/" rel="tag"># spark</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-5/" rel="prev" title="SparkEnv机制">
+      <i class="fa fa-chevron-left"></i> SparkEnv机制
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-7/" rel="next" title="Spark MemoryManager">
+      Spark MemoryManager <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A6%82%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Shuffle%E5%8E%86%E5%8F%B2"><span class="nav-number">2.</span> <span class="nav-text">Shuffle历史</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ShuffleManager"><span class="nav-number">3.</span> <span class="nav-text">ShuffleManager</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SortShuffleManager"><span class="nav-number">4.</span> <span class="nav-text">SortShuffleManager</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Shuffle-Write"><span class="nav-number">4.1.</span> <span class="nav-text">Shuffle Write</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#SortShuffleWriter"><span class="nav-number">4.1.1.</span> <span class="nav-text">SortShuffleWriter</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#BypassMergeSortShuffleWriter"><span class="nav-number">4.1.2.</span> <span class="nav-text">BypassMergeSortShuffleWriter</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#UnsafeShuffleWriter"><span class="nav-number">4.1.3.</span> <span class="nav-text">UnsafeShuffleWriter</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">4.1.4.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Shuffle-Read"><span class="nav-number">4.2.</span> <span class="nav-text">Shuffle Read</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#BlockStoreShuffleReader"><span class="nav-number">4.2.1.</span> <span class="nav-text">BlockStoreShuffleReader</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ShuffleBlockResolver"><span class="nav-number">4.3.</span> <span class="nav-text">ShuffleBlockResolver</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">5.</span> <span class="nav-text">参考</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Peng Lei"
+      src="/images/me.jpg">
+  <p class="site-author-name" itemprop="name">Peng Lei</p>
+  <div class="site-description" itemprop="description">壁立千仞.无欲则刚</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">22</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="mailto:peng.8lei@gmail.com" title="E-Mail → mailto:peng.8lei@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Peng Lei</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">57k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">52 分钟</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+  <script>
+    (function(){
+      var canonicalURL, curProtocol;
+      //Get the <link> tag
+      var x=document.getElementsByTagName("link");
+		//Find the last canonical URL
+		if(x.length > 0){
+			for (i=0;i<x.length;i++){
+				if(x[i].rel.toLowerCase() == 'canonical' && x[i].href){
+					canonicalURL=x[i].href;
+				}
+			}
+		}
+    //Get protocol
+	    if (!canonicalURL){
+	    	curProtocol = window.location.protocol.split(':')[0];
+	    }
+	    else{
+	    	curProtocol = canonicalURL.split(':')[0];
+	    }
+      //Get current URL if the canonical URL does not exist
+	    if (!canonicalURL) canonicalURL = window.location.href;
+	    //Assign script content. Replace current URL with the canonical URL
+      !function(){var e=/([http|https]:\/\/[a-zA-Z0-9\_\.]+\.baidu\.com)/gi,r=canonicalURL,t=document.referrer;if(!e.test(r)){var n=(String(curProtocol).toLowerCase() === 'https')?"https://sp0.baidu.com/9_Q4simg2RQJ8t7jm9iCKT-xh_/s.gif":"//api.share.baidu.com/s.gif";t?(n+="?r="+encodeURIComponent(document.referrer),r&&(n+="&l="+r)):r&&(n+="?l="+r);var i=new Image;i.src=n}}(window);})();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '566a3c91fad003b56198',
+      clientSecret: '347cd7479fcc953935f228ecdf3c6af447e51793',
+      repo        : 'Comments',
+      owner       : 'Peng-Lei',
+      admin       : ['Peng-Lei'],
+      id          : 'b419f7a4fb4ad33c942ab2c43471f6f3',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+</body>
+</html>

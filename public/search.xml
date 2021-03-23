@@ -2,7 +2,7 @@
 <search>
   <entry>
     <title>SparkEnv机制</title>
-    <url>/2021/02/23/SparkEnv%E5%88%86%E6%9E%90/</url>
+    <url>/2021/03/23/SparkEnv%E5%88%86%E6%9E%90/</url>
     <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>一段来自代码的注释：</p>
 <p>“ <em>Holds all the runtime environment objects for a running Spark instance (either master or worker),including the serializer, RpcEnv, block manager, map output tracker, etc. Currently Spark code finds the SparkEnv through a global variable, so all the threads can access the same SparkEnv. It can be accessed by SparkEnv.get (e.g. after creating a SparkContext).</em> ”</p>
 <a id="more"></a>
@@ -49,8 +49,44 @@
       </tags>
   </entry>
   <entry>
+    <title>Spark之Shuffle</title>
+    <url>/2021/03/23/Spark%E4%B9%8BShuffle/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Spark 作为一个基于内存的分布式计算引擎，其内存管理模块在整个系统中扮演着非常重要的角色。理解 Spark 内存管理的基本原理，有助于更好地开发 Spark 应用程序和进行性能调优。</p>
+<a id="more"></a>
+
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+<p><a href="https://developer.ibm.com/zh/articles/ba-cn-apache-spark-memory-management/">Apache Spark 内存管理详解</a></p>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>Spark Shuffle</tag>
+        <tag>Spark Core</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>SparkSession</title>
+    <url>/2021/03/23/Spark/Spark-Application-1/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>一段来自代码的注释：</p>
+<p>“ <em>Holds all the runtime environment objects for a running Spark instance (either master or worker),including the serializer, RpcEnv, block manager, map output tracker, etc. Currently Spark code finds the SparkEnv through a global variable, so all the threads can access the same SparkEnv. It can be accessed by SparkEnv.get (e.g. after creating a SparkContext).</em> ”</p>
+<a id="more"></a>
+
+<p>SparkEnv是SparkContext对象中最重要的一个属性，保存着Spark运行实例的所有运行环境信息，包括序列化、RpcEnv，block 管理等。关于SparkContext这个大类我们后续分析。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>Spark</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>Spark内存管理机制</title>
-    <url>/2021/02/22/Spark%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86%E6%9C%BA%E5%88%B6/</url>
+    <url>/2021/03/23/Spark%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86%E6%9C%BA%E5%88%B6/</url>
     <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Spark 作为一个基于内存的分布式计算引擎，其内存管理模块在整个系统中扮演着非常重要的角色。理解 Spark 内存管理的基本原理，有助于更好地开发 Spark 应用程序和进行性能调优。</p>
 <a id="more"></a>
 
@@ -119,6 +155,831 @@
       </categories>
       <tags>
         <tag>Spark-Memory</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark on K8S</title>
+    <url>/2021/03/23/Spark/Spark-On-K8S-1/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>todo</p>
+<a id="more"></a>
+
+
+
+
+
+<h2 id="软件版本"><a href="#软件版本" class="headerlink" title="软件版本"></a>软件版本</h2><ul>
+<li>Spark2.3版本以上</li>
+<li>Kubernetes 版本&gt;= 1.6</li>
+</ul>
+<h2 id="How-it-works"><a href="#How-it-works" class="headerlink" title="How it works"></a>How it works</h2><p><img src="/images/spark/image013.png"></p>
+<p>通过spark-submit可以直接想Kubernetes集群提交Spark application，提交过程包括以下：</p>
+<ul>
+<li>在Kubernetes pod中创建Spark driver.</li>
+<li>driver在Kubernetes pod中创建executor，并连接它们，然后让它们执行application代码。</li>
+<li>当Spark application执行完成，executor pods会被终止并清理，但是Driver的pod会持久化日志并且标记为“completed”状态，直到它被手动或者真正的垃圾清理回收掉。</li>
+</ul>
+<p>注：在commpleted状态的driver pod是不占用任何计算和内存资源的。</p>
+<p>driver和executor运行的pod的调度是交由Kubernetes来管理的，客户端只需要通过api跟Kubernetes交互即可，可以通过配置属性来使用node selector把driver和executor的pod调度到一定范围内的可用节点上。当然了，以后的版本可能在pod的调度上，使用亲和性等是调度更加智能把。</p>
+<h2 id="Submitting-Application-to-Kubernetes"><a href="#Submitting-Application-to-Kubernetes" class="headerlink" title="Submitting Application to Kubernetes"></a>Submitting Application to Kubernetes</h2><h3 id="Docker-Images"><a href="#Docker-Images" class="headerlink" title="Docker Images"></a>Docker Images</h3><p>Kubernetes需要用户提供pods内容器运行的镜像，镜像必须是Kubernetes支持的container运行时环境，Docker就是其中被使用广泛的一种container运行时。</p>
+<p>Spark工程包下已经提供了Dockerfile</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;home&#x2F;penglei&#x2F;Bigdata&#x2F;spark&#x2F;resource-managers&#x2F;kubernetes&#x2F;docker&#x2F;src&#x2F;main&#x2F;dockerfiles&#x2F;spark</span><br></pre></td></tr></table></figure>
+<p>Spark同样提供了docker-image-tool.sh脚本,可以直接用来构建发布Spark的docker image，默认情况下，通过脚本构建的JVM运行环境，可以通过option来更改。</p>
+<p>简而言之，我们需要提供Spark的image，这个image可以使用Spark提供的脚本来创建。</p>
+<h3 id="Cluster-Mode-Command"><a href="#Cluster-Mode-Command" class="headerlink" title="Cluster Mode Command"></a>Cluster Mode Command</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ .&#x2F;bin&#x2F;spark-submit \</span><br><span class="line">    --master k8s:&#x2F;&#x2F;https:&#x2F;&#x2F;&lt;k8s-apiserver-host&gt;:&lt;k8s-apiserver-port&gt; \</span><br><span class="line">    --deploy-mode cluster \</span><br><span class="line">    --name spark-pi \</span><br><span class="line">    --class org.apache.spark.examples.SparkPi \</span><br><span class="line">    --conf spark.executor.instances&#x3D;5 \</span><br><span class="line">    --conf spark.kubernetes.container.image&#x3D;&lt;spark-image&gt; \</span><br><span class="line">    local:&#x2F;&#x2F;&#x2F;path&#x2F;to&#x2F;examples.jar</span><br></pre></td></tr></table></figure>
+
+
+<h3 id="Dependency-Management"><a href="#Dependency-Management" class="headerlink" title="Dependency Management"></a>Dependency Management</h3><pre><code> curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+ sudo install minikube-linux-amd64 /usr/local/bin/minikube
+</code></pre>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark on K8S Submit分析</title>
+    <url>/2021/03/23/Spark/Spark-On-K8S-2/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Spark已经集成了Kuburnetes资源管理框架，集成的方式是在Spark中启动一个客户端跟K8S的ApiServer进行通信，申请和释放资源来运行Driver和Executor。</p>
+<a id="more"></a>
+
+<p>关于submit这块儿的代码位于：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">~&#x2F;Bigdata&#x2F;spark&#x2F;resource-managers&#x2F;kubernetes&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;org&#x2F;apache&#x2F;spark&#x2F;deploy&#x2F;k8s&#x2F;submit</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="核心"><a href="#核心" class="headerlink" title="核心"></a>核心</h2><p>我们先看一张关于submit部分总的分析图</p>
+<p><img src="/images/spark/image012.png"></p>
+<p>从图中可以看出，在submit逻辑中，最核心的是KubernetesClientApplication的处理逻辑。</p>
+<h3 id="KubernetesClientApplication"><a href="#KubernetesClientApplication" class="headerlink" title="KubernetesClientApplication"></a>KubernetesClientApplication</h3><p>一段来自代码中的注释</p>
+<p><em>Main class and entry point of application submission in KUBERNETES mode.</em></p>
+<p>关于如何从spark-submit脚本调用到这里，我们后续在“Spark on K8S 运行流程”分析。</p>
+<ol>
+<li><p>进入start方法，解析参数，调用run方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class KubernetesClientApplication extends SparkApplication &#123;</span><br><span class="line"></span><br><span class="line">  override def start(args: Array[String], conf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    val parsedArguments &#x3D; ClientArguments.fromCommandLineArgs(args)</span><br><span class="line">    run(parsedArguments, conf)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  private def run(clientArguments: ClientArguments, sparkConf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    val client &#x3D; new Client(</span><br><span class="line">         kubernetesConf,</span><br><span class="line">         new KubernetesDriverBuilder(),</span><br><span class="line">         kubernetesClient,</span><br><span class="line">         watcher)</span><br><span class="line">       client.run()</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>创建Client对象，调用Client对象的run方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class Client(</span><br><span class="line">    conf: KubernetesDriverConf,</span><br><span class="line">    builder: KubernetesDriverBuilder,</span><br><span class="line">    kubernetesClient: KubernetesClient,</span><br><span class="line">    watcher: LoggingPodStatusWatcher) extends Logging &#123;</span><br><span class="line"></span><br><span class="line">  def run(): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;准备很多参数最终生成PodBuilder[resolvedDriverPod]，然后创建Driver</span><br><span class="line">    var watch: Watch &#x3D; null</span><br><span class="line">    val createdDriverPod &#x3D; kubernetesClient.pods().create(resolvedDriverPod)</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;申请绑定Driver依赖的资源</span><br><span class="line">    try &#123;</span><br><span class="line">      val otherKubernetesResources &#x3D; resolvedDriverSpec.driverKubernetesResources ++ Seq(configMap)</span><br><span class="line">      addOwnerReference(createdDriverPod, otherKubernetesResources)</span><br><span class="line">      kubernetesClient.resourceList(otherKubernetesResources: _*).createOrReplace()</span><br><span class="line">    &#125; catch &#123;</span><br><span class="line">      case NonFatal(e) &#x3D;&gt;</span><br><span class="line">        kubernetesClient.pods().delete(createdDriverPod)</span><br><span class="line">        throw e</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    val sId &#x3D; Seq(conf.namespace, driverPodName).mkString(&quot;:&quot;)</span><br><span class="line">    &#x2F;&#x2F;通过Watcher监控Driver Pod的运行</span><br><span class="line">    breakable &#123;</span><br><span class="line">      while (true) &#123;</span><br><span class="line">        val podWithName &#x3D; kubernetesClient</span><br><span class="line">          .pods()</span><br><span class="line">          .withName(driverPodName)</span><br><span class="line">        watcher.reset()</span><br><span class="line">        watch &#x3D; podWithName.watch(watcher)</span><br><span class="line">        watcher.eventReceived(Action.MODIFIED, podWithName.get())</span><br><span class="line"></span><br><span class="line">        if(watcher.watchOrStop(sId)) &#123;</span><br><span class="line">          watch.close()</span><br><span class="line">          break</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+</li>
+</ol>
+<h3 id="LoggingPodStatusWatcher"><a href="#LoggingPodStatusWatcher" class="headerlink" title="LoggingPodStatusWatcher"></a>LoggingPodStatusWatcher</h3><p>LoggingPodStatusWatcher按照配置时间去监听Pod的状态</p>
+<p>一段来自代码的注释</p>
+<p> <em>A monitor for the running Kubernetes pod of a Spark application. Status logging occurs on every state change and also at an interval for liveness.</em></p>
+<h2 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h2><p><img src="/images/spark/image007.png"></p>
+<h3 id="K8sSubmitOp"><a href="#K8sSubmitOp" class="headerlink" title="K8sSubmitOp"></a>K8sSubmitOp</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-24793">SPARK-24793</a>加强了spark-sbumit，更加有利于Application的管理.</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+<p><a href="https://cloud.tencent.com/developer/article/1674883">Spark submit分析</a></p>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark on K8S Feature分析</title>
+    <url>/2021/03/23/Spark/Spark-On-K8S-3/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在Spark App的执行过程中，有两种进程：Driver和Executor，这两种进程都会运行在K8S的Pod中，那么Driver和Executor运行的Pod环境是什么样的呢？又是如何定义呢？这就是feature包的作用了。</p>
+<a id="more"></a>
+
+<p>这篇博客所分析的代码路径</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">~&#x2F;Bigdata&#x2F;spark&#x2F;resource-managers&#x2F;kubernetes&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;org&#x2F;apache&#x2F;spark&#x2F;deploy&#x2F;k8s&#x2F;features</span><br></pre></td></tr></table></figure>
+<h2 id="Driver和Executor的创建"><a href="#Driver和Executor的创建" class="headerlink" title="Driver和Executor的创建"></a>Driver和Executor的创建</h2><h3 id="Driver的创建"><a href="#Driver的创建" class="headerlink" title="Driver的创建"></a>Driver的创建</h3><ol>
+<li><p>KubernetesClientApplication的入口方法start，调用自己的run 方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class KubernetesClientApplication extends SparkApplication &#123;</span><br><span class="line"></span><br><span class="line">  override def start(args: Array[String], conf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    val parsedArguments &#x3D; ClientArguments.fromCommandLineArgs(args)</span><br><span class="line">    run(parsedArguments, conf)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  private def run(clientArguments: ClientArguments, sparkConf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">   Utils.tryWithResource(SparkKubernetesClientFactory.createKubernetesClient(</span><br><span class="line">      master,</span><br><span class="line">      Some(kubernetesConf.namespace),</span><br><span class="line">      KUBERNETES_AUTH_SUBMISSION_CONF_PREFIX,</span><br><span class="line">      SparkKubernetesClientFactory.ClientType.Submission,</span><br><span class="line">      sparkConf,</span><br><span class="line">      None,</span><br><span class="line">      None)) &#123; kubernetesClient &#x3D;&gt;</span><br><span class="line">        &#x2F;&#x2F;创建client并运行</span><br><span class="line">        val client &#x3D; new Client(</span><br><span class="line">          kubernetesConf,</span><br><span class="line">          new KubernetesDriverBuilder(),</span><br><span class="line">          kubernetesClient,</span><br><span class="line">          watcher)</span><br><span class="line">        client.run()</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>Client的run方法创建Driver</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class Client(</span><br><span class="line">    conf: KubernetesDriverConf,</span><br><span class="line">    builder: KubernetesDriverBuilder,</span><br><span class="line">    kubernetesClient: KubernetesClient,</span><br><span class="line">    watcher: LoggingPodStatusWatcher) extends Logging &#123;</span><br><span class="line"></span><br><span class="line">  def run(): Unit &#x3D; &#123;</span><br><span class="line">    &#x2F;&#x2F;重点-&gt; 构建Pod的Spec即buildFromFeatures</span><br><span class="line">    val resolvedDriverSpec &#x3D; builder.buildFromFeatures(conf, kubernetesClient)</span><br><span class="line">    ...</span><br><span class="line">    val resolvedDriverPod &#x3D; new PodBuilder(resolvedDriverSpec.pod.pod)</span><br><span class="line">      .editSpec()</span><br><span class="line">        .addToContainers(resolvedDriverContainer)</span><br><span class="line">        .addNewVolume()</span><br><span class="line">          .withName(SPARK_CONF_VOLUME_DRIVER)</span><br><span class="line">          .withNewConfigMap()</span><br><span class="line">            .withItems(KubernetesClientUtils.buildKeyToPathObjects(confFilesMap).asJava)</span><br><span class="line">            .withName(configMapName)</span><br><span class="line">            .endConfigMap()</span><br><span class="line">          .endVolume()</span><br><span class="line">        .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;调用kubernetesClient去创建Pod</span><br><span class="line">    val createdDriverPod &#x3D; kubernetesClient.pods().create(resolvedDriverPod)</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+</li>
+</ol>
+<p>所以呢？<code>Driver</code>的创建依赖于<code>KubernetesDriverBuilder</code>的<code>buildFromFeatures</code>方法</p>
+<h3 id="Executor的创建"><a href="#Executor的创建" class="headerlink" title="Executor的创建"></a>Executor的创建</h3><ol>
+<li><p>ExecutorPodsAllocator的start方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def start(applicationId: String): Unit &#x3D; &#123;</span><br><span class="line">  snapshotsStore.addSubscriber(podAllocationDelay) &#123;</span><br><span class="line">    onNewSnapshots(applicationId, _)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>ExecutorPodsAllocator的onNewSnapshots方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def onNewSnapshots(</span><br><span class="line">    applicationId: String,</span><br><span class="line">    snapshots: Seq[ExecutorPodsSnapshot]): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    if (newlyCreatedExecutorsForRpId.isEmpty</span><br><span class="line">      &amp;&amp; knownPodCount &lt; targetNum) &#123;</span><br><span class="line">      requestNewExecutors(targetNum, knownPodCount, applicationId, rpId)</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>ExecutorPodsAllocator的requestNewExecutors方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def requestNewExecutors(</span><br><span class="line">    expected: Int,</span><br><span class="line">    running: Int,</span><br><span class="line">    applicationId: String,</span><br><span class="line">    resourceProfileId: Int): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    val resolvedExecutorSpec &#x3D; executorBuilder.buildFromFeatures(executorConf, secMgr,</span><br><span class="line">      kubernetesClient, rpIdToResourceProfile(resourceProfileId))      </span><br><span class="line">    ...</span><br><span class="line">    val podWithAttachedContainer &#x3D; new PodBuilder(executorPod.pod)</span><br><span class="line">      .editOrNewSpec()</span><br><span class="line">      .addToContainers(executorPod.container)</span><br><span class="line">      .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    val createdExecutorPod &#x3D; kubernetesClient.pods().create(podWithAttachedContainer)</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">   </span><br></pre></td></tr></table></figure>
+<p>所以呢？<code>Executor</code>的创建依赖于<code>KubernetesExecutorBuilder</code>的<code>buildFromFeatures</code>方法</p>
+</li>
+</ol>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>不管是Driver还是Executor都是通过kubernetesClient客户端调用create的方法创建，只是传入的PodBuilder参数不同，创建时机不同。在构建PodBuilder的过程中，使用了feature包的各种配置进行组装。</p>
+<p><img src="/images/spark/image010.png"></p>
+<h2 id="feature"><a href="#feature" class="headerlink" title="feature"></a>feature</h2><p><img src="/images/spark/image011.png"></p>
+<p>先看一下<code>KubernetesFeatureConfigStep</code>，这个是基础接口，后面的实现类其实非常简单，从类名上基本都识别出功能特性。</p>
+<p>一段来自代码中的注释</p>
+<p> <code>A collection of functions that together represent a &quot;feature&quot; in pods that are launched for Spark drivers and executors.</code></p>
+<p>就是给Spark drivers 和 executors定义运行环境的功能集。如果我们想给它添加特定的运行环境，只需要定义一个功能子类实现<code>KubernetesFeatureConfigStep</code>接口即可。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+<p><a href="https://cloud.tencent.com/developer/article/1674888">Spark on K8S feature分析</a></p>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark on K8S Shuffle分析</title>
+    <url>/2021/03/23/Spark/Spark-On-K8S-5/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><a id="more"></a>
+
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark on K8S Scheduler分析</title>
+    <url>/2021/03/23/Spark/Spark-On-K8S-4/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Spark Kubernetes采用了跟Yarn类似的方式集成到了Spark中，Kubernetes作为一个新的Resource manager供Spark使用，具体来说：</p>
+<ol>
+<li>通过继承<code>ExternalClusterManager</code>实现了<code>KubernetesClusterManager</code>的外部集群管理器。</li>
+<li>通过继承<code>CoarseGrainedSchedulerBackend</code>实现`KubernetesClusterSchedulerBackend``资源调度器。</li>
+</ol>
+<a id="more"></a>
+
+<p>本篇博客的源码目录</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">~&#x2F;Bigdata&#x2F;spark&#x2F;resource-managers&#x2F;kubernetes&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;org&#x2F;apache&#x2F;spark&#x2F;scheduler&#x2F;cluster&#x2F;k8s</span><br></pre></td></tr></table></figure>
+<h2 id="核心"><a href="#核心" class="headerlink" title="核心"></a>核心</h2><p>先看一张概要图</p>
+<p><img src="/images/spark/image008.png"></p>
+<p>scheduler核心是KubernetesClusterManager和KubernetesClusterSchedulerBackend</p>
+<h3 id="ClusterManager"><a href="#ClusterManager" class="headerlink" title="ClusterManager"></a>ClusterManager</h3><p>关于ExternalClusterManager：</p>
+<p><em>A cluster manager interface to plugin external scheduler.</em></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;&#x2F;是否可以根据master URL创建集群管理器</span><br><span class="line">def canCreate(masterURL: String): Boolean</span><br><span class="line">&#x2F;&#x2F;创建TaskScheduler</span><br><span class="line">def createTaskScheduler(sc: SparkContext, masterURL: String): TaskScheduler</span><br><span class="line">&#x2F;&#x2F;创建SchedulerBackend,不同的集群管理器有不同的是实现，但一定继承自SchedulerBackend</span><br><span class="line">def createSchedulerBackend(sc: SparkContext,masterURL: String,scheduler: </span><br><span class="line">                            TaskScheduler): SchedulerBackend</span><br><span class="line">&#x2F;&#x2F;初始化TaskScheduler和SchedulerBackend                         </span><br><span class="line">def initialize(scheduler: TaskScheduler, backend: SchedulerBackend): Unit</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>所以想在Spark上对接一款自定义的集群管理器，其实还是比较简单的，只要实现这四个接口就行了。</p>
+<h4 id="KubernetesClusterManager"><a href="#KubernetesClusterManager" class="headerlink" title="KubernetesClusterManager"></a>KubernetesClusterManager</h4><p><code>KubernetesClusterManager</code>作为Spark on K8S的管理中心，核心功能是负责<code>KubernetesClusterSchedulerBackend</code>的创建。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">override def createSchedulerBackend(</span><br><span class="line">    sc: SparkContext,</span><br><span class="line">    masterURL: String,</span><br><span class="line">    scheduler: TaskScheduler): SchedulerBackend &#x3D; &#123;</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  new KubernetesClusterSchedulerBackend(</span><br><span class="line">    scheduler.asInstanceOf[TaskSchedulerImpl],</span><br><span class="line">    sc,</span><br><span class="line">    kubernetesClient,</span><br><span class="line">    schedulerExecutorService,</span><br><span class="line">    snapshotsStore,</span><br><span class="line">    executorPodsAllocator,</span><br><span class="line">    executorPodsLifecycleEventHandler,</span><br><span class="line">    podsWatchEventSource,</span><br><span class="line">    podsPollingEventSource)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p>TaskScheduler</p>
+</li>
+<li><p>SparkContext</p>
+</li>
+<li><p>KubernetesClient</p>
+</li>
+<li><p>ScheduledExecutorService</p>
+</li>
+<li><p>ExecutorPodsSnapshotsStore</p>
+</li>
+<li><p>ExecutorPodsAllocator</p>
+</li>
+<li><p>ExecutorPodsLifecycleManager</p>
+</li>
+<li><p>ExecutorPodsWatchSnapshotSource</p>
+</li>
+<li><p>ExecutorPodsPollingSnapshotSource</p>
+</li>
+</ul>
+<h3 id="SchedulerBackend"><a href="#SchedulerBackend" class="headerlink" title="SchedulerBackend"></a>SchedulerBackend</h3><p><code>KubernetesClusterSchedulerBackend</code>继承自<code>CoarseGrainedSchedulerBackend</code>，其实Yarn和mesos的SchedulerBackend也是继承自<code>CoarseGrainedSchedulerBackend</code>，关于<code>CoarseGrainedSchedulerBackend</code></p>
+<p>来自一段代码中的注释</p>
+<p> <em>A scheduler backend that waits for coarse-grained executors to connect.This backend holds onto each executor for the duration of the Spark job rather than relinquishing executors whenever a task is done and asking the scheduler to launch a new executor for each new task. Executors may be launched in a variety of ways, such as Mesos tasks for the coarse-grained Mesos mode or standalone processes for Spark’s standalone deploy mode(spark.deploy.</em>).*</p>
+<p>一个等待coarse-grained executors连接的调度程序后端，在Spark Job的执行期间这个调度后端保留所有的executor，而不是task执行介绍后释放executor，然后执行新的task的时候再申请executor。executor可以被多种资源管理器提供，比如mesos、standalone等。</p>
+<p>通过不同的资源管理器，可以以更多的方式创建executor，当然包括Yarn、K8S等。</p>
+<h4 id="DriverEndpoint"><a href="#DriverEndpoint" class="headerlink" title="DriverEndpoint"></a>DriverEndpoint</h4><p>这个顾名思义代表的Driver的endpoint，为什么要有这个呢？？？</p>
+<p>其实可以想想Driver是要跟SchedulerBackend通信的</p>
+<p>在K8S上的实现是<code>KubernetesDriverEndpoint</code></p>
+<h4 id="KubernetesClusterSchedulerBackend"><a href="#KubernetesClusterSchedulerBackend" class="headerlink" title="KubernetesClusterSchedulerBackend"></a>KubernetesClusterSchedulerBackend</h4><p>主要负责executor的请求和kill以及删除。</p>
+<h2 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h2><p>剩下的所有类定义包括接口的实现，其实都是在为KubernetesClusterSchedulerBackend服务</p>
+<p><img src="/images/spark/image009.png"></p>
+<p>如图，所有类都是围绕Executor Pod的管理，包括快照的、生命周期、创建删除等。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;&#x2F;Executor的构建类,仅仅是根据feature返回Executor的Spec</span><br><span class="line">KubernetesExecutorBuilder </span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F;Executor Pods Snapshot 的定义</span><br><span class="line">ExecutorPodsSnapshot</span><br><span class="line">&#x2F;&#x2F;Executor Pods状态 </span><br><span class="line">ExecutorPodState</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F;Executor Pods Snapshot的存储接口</span><br><span class="line">ExecutorPodsSnapshotsStore</span><br><span class="line">&#x2F;&#x2F;Executor Pods Snapshot的存储接口实现类</span><br><span class="line">ExecutorPodsSnapshotsStoreImpl </span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F;监听Executor Pods Snapshot</span><br><span class="line">ExecutorPodsWatchSnapshotSource</span><br><span class="line">&#x2F;&#x2F;拉去Executor Pods Snapshot(定时)</span><br><span class="line">ExecutorPodsPollingSnapshotSource</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F;Executor Pods生命周期管理</span><br><span class="line">ExecutorPodsLifecycleManager</span><br><span class="line">&#x2F;&#x2F;Executor Pods的分配</span><br><span class="line">ExecutorPodsAllocator </span><br></pre></td></tr></table></figure>
+
+
+<p>总的来说，ExecutorPodsSnapshotsStoreImpl是一个生产者-消费者模型。在这个模型中：</p>
+<p>生产者：</p>
+<ul>
+<li>ExecutorPodsWatchSnapshotSource通过继承K8S的Watcher，重写eventReceived方法，对Executor Pod进行监听，然后调用ExecutorPodsSnapshotsStore的updatePod方法，进行快照更新</li>
+<li>ExecutorPodsPollingSnapshotSource通过30秒的定时任务，对Executor Pod进行监听，然后调用ExecutorPodsSnapshotsStore的replaceSnapshot方法，进行快照更新</li>
+</ul>
+<p>消费者：</p>
+<ul>
+<li><p>ExecutorPodsAllocator</p>
+<p>  通过<code>ExecutorPodsSnapshotsStore</code>的<code>addSubscriber</code>进行订阅</p>
+</li>
+<li><p>ExecutorPodsLifecycleManager</p>
+<p>  通过<code>ExecutorPodsSnapshotsStore</code>的<code>addSubscriber</code>进行订阅</p>
+</li>
+</ul>
+<p><code>ExecutorPodsWatchSnapshotSource</code>,<code>ExecutorPodsPollingSnapshotSource</code>,<code>ExecutorPodsLifecycleManager</code>,<code>ExecutorPodsAllocator</code> 都包含了<code>KubernetesClient</code>，表示都要跟K8S的apiServer进行交互。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://cloud.tencent.com/developer/article/1674890">Spark K8S scheduler 分析</a></p>
+<p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark on K8S 运行流程</title>
+    <url>/2021/03/23/Spark/Spark-On-K8S-6/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>使用spark-submit如何提交一个application到Kubernetes集群使它运行起来，本篇博客将从源码的角度一步步分析整个流程。</p>
+<a id="more"></a>
+
+<p>从spark-submit到SparkApplication运行起来的时序如下图所示：</p>
+<p><img src="/images/spark/image014.png" alt="image014"></p>
+<p>我们依次对时序图中的每一个节点进行分析</p>
+<h2 id="spark-submit"><a href="#spark-submit" class="headerlink" title="spark-submit"></a>spark-submit</h2><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">if [ -z &quot;$&#123;SPARK_HOME&#125;&quot; ]; then</span><br><span class="line">  # 设置环境变量</span><br><span class="line">  source &quot;$(dirname &quot;$0&quot;)&quot;&#x2F;find-spark-home</span><br><span class="line">fi</span><br><span class="line"></span><br><span class="line"># disable randomized hash for string in Python 3.3+</span><br><span class="line">export PYTHONHASHSEED&#x3D;0</span><br><span class="line">#调用spark-class脚本执行SparkSubmit类</span><br><span class="line">exec &quot;$&#123;SPARK_HOME&#125;&quot;&#x2F;bin&#x2F;spark-class org.apache.spark.deploy.SparkSubmit &quot;$@&quot;</span><br></pre></td></tr></table></figure>
+<h2 id="spark-class"><a href="#spark-class" class="headerlink" title="spark-class"></a>spark-class</h2><ul>
+<li>加载环境变量</li>
+<li>找到执行RUNNER</li>
+<li>找到Spark的Jar包</li>
+<li>添加launcher到class path中</li>
+<li>调用launcher.Main构造参数</li>
+<li>exec “${CMD[@]}” 执行命令</li>
+</ul>
+<p>通过简单的spark-submit -h看看CMD最后的形式</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;home&#x2F;penglei&#x2F;Tools&#x2F;java&#x2F;jdk&#x2F;bin&#x2F;java -cp &#x2F;home&#x2F;penglei&#x2F;Bigdata&#x2F;spark&#x2F;conf&#x2F;:&#x2F;home&#x2F;penglei&#x2F;Bigdata&#x2F;spark&#x2F;assembly&#x2F;target&#x2F;scala-2.12&#x2F;jars&#x2F;* -Xmx1g org.apache.spark.deploy.SparkSubmit --help</span><br></pre></td></tr></table></figure>
+<p>可以看到就是java -cp 执行类而已</p>
+<h2 id="launcher-Main"><a href="#launcher-Main" class="headerlink" title="launcher.Main"></a>launcher.Main</h2><p>一段来自代码中的注释</p>
+<p><em>Command line interface for the Spark launcher. Used internally by Spark scripts.</em></p>
+<p>在spark-class脚本中构建的CMD就是通过该类实现的。</p>
+<h2 id="SparkSubmit-main"><a href="#SparkSubmit-main" class="headerlink" title="SparkSubmit.main"></a>SparkSubmit.main</h2><p>由spark-class脚本中最后的输出可以看到调用了org.apache.spark.deploy.SparkSubmit，SparkSubmit的main方法如下：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">override def main(args: Array[String]): Unit &#x3D; &#123;</span><br><span class="line">  val submit &#x3D; new SparkSubmit() &#123;</span><br><span class="line">    self &#x3D;&gt;</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  submit.doSubmit(args)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="SparkSubmit-doSubmit"><a href="#SparkSubmit-doSubmit" class="headerlink" title="SparkSubmit.doSubmit"></a>SparkSubmit.doSubmit</h2><p>可以看到目前SparkSubmit支持的Action一共由四种</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def doSubmit(args: Array[String]): Unit &#x3D; &#123;</span><br><span class="line">  ...</span><br><span class="line">  appArgs.action match &#123;</span><br><span class="line">    case SparkSubmitAction.SUBMIT &#x3D;&gt; submit(appArgs, uninitLog)</span><br><span class="line">    case SparkSubmitAction.KILL &#x3D;&gt; kill(appArgs)</span><br><span class="line">    case SparkSubmitAction.REQUEST_STATUS &#x3D;&gt; requestStatus(appArgs)</span><br><span class="line">    case SparkSubmitAction.PRINT_VERSION &#x3D;&gt; printVersion()</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="SparkSubmit-submit"><a href="#SparkSubmit-submit" class="headerlink" title="SparkSubmit.submit"></a>SparkSubmit.submit</h2><p>一段来自代码的注释</p>
+<p><em>Submit the application using the provided parameters, ensuring to first wrap in a doAs when –proxy-user is specified.</em></p>
+<p>最终调用的<code>doRunMain</code>方法</p>
+<h2 id="SparkSubmit-doRunMain"><a href="#SparkSubmit-doRunMain" class="headerlink" title="SparkSubmit.doRunMain"></a>SparkSubmit.doRunMain</h2><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def doRunMain(): Unit &#x3D; &#123;</span><br><span class="line">  if (args.proxyUser !&#x3D; null) &#123;</span><br><span class="line">    ...</span><br><span class="line">    runMain(args, uninitLog)</span><br><span class="line">  &#125; else &#123;</span><br><span class="line">    runMain(args, uninitLog)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>判断是否设置了执行代理用户，然后执行<code>runMain</code>方法</p>
+<h2 id="SparkSubmit-runMain"><a href="#SparkSubmit-runMain" class="headerlink" title="SparkSubmit.runMain"></a>SparkSubmit.runMain</h2><p>一段来自代码中的注释</p>
+<p><em>Run the main method of the child class using the submit arguments. This runs in two steps. First, we prepare the launch environment by setting up the appropriate classpath, system properties, and application arguments for running the child main class based on the cluster manager and the deploy mode. Second, we use this launch environment to invoke the main method of the child main class.</em> </p>
+<p><em>Note that this main class will not be the one provided by the user if we’re running cluster deploy mode or python applications.</em></p>
+<p>这里的child class是指用户提交的Application的class。这个方法涉及两个步骤</p>
+<ul>
+<li>设置launch环境信息，包括classpath、system properties、application arguments for cluster manager以及其他一些参数</li>
+<li>反射加载主类，执行main方法</li>
+</ul>
+<p>用户的Application的class会被包装进JavaMainApplication来调用。</p>
+<p>注意：如果是cluster deploy mode或者python的application的话，此时的main class不是用户提交的类，而是SparkApplication的子类。</p>
+<p>具体关于这个child main class的含义，我们在下面的prepareSumitEnvironment分析。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def runMain(args: SparkSubmitArguments, uninitLog: Boolean): Unit &#x3D; &#123;</span><br><span class="line">  &#x2F;&#x2F;step 1,准备launch环境信息</span><br><span class="line">  val (childArgs, childClasspath, sparkConf, childMainClass) &#x3D; prepareSubmitEnvironment(args)</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  var mainClass: Class[_] &#x3D; null</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line">  &#x2F;&#x2F;step2, 反射加载主类，执行main方法</span><br><span class="line">  val app: SparkApplication &#x3D; if (classOf[SparkApplication].isAssignableFrom(mainClass)) &#123;</span><br><span class="line">    mainClass.getConstructor().newInstance().asInstanceOf[SparkApplication]</span><br><span class="line">  &#125; else &#123;</span><br><span class="line">    new JavaMainApplication(mainClass)</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  try &#123;</span><br><span class="line">    app.start(childArgs.toArray, sparkConf)</span><br><span class="line">  &#125; catch &#123;</span><br><span class="line">    case t: Throwable &#x3D;&gt;</span><br><span class="line">      throw findCause(t)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+<h2 id="SparkSubmit-prepareSumitEnvironment"><a href="#SparkSubmit-prepareSumitEnvironment" class="headerlink" title="SparkSubmit.prepareSumitEnvironment"></a>SparkSubmit.prepareSumitEnvironment</h2><p>接着上面，我们分析prepareSubmitEnvironment方法</p>
+<p>一段来自代码中的注释</p>
+<p><em>Prepare the environment for submitting an application.</em></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">@param args the parsed SparkSubmitArguments used for environment preparation.</span><br><span class="line">@param conf the Hadoop Configuration, this argument will only be set in unit test.</span><br><span class="line">@return a 4-tuple:</span><br><span class="line"> (1) the arguments for the child process,</span><br><span class="line"> (2) a list of classpath entries for the child,</span><br><span class="line"> (3) a map of system properties, and</span><br><span class="line"> (4) the main class for the child</span><br></pre></td></tr></table></figure>
+<p>整个函数的逻辑都是围绕处理四个返回值来展开的，主要步骤包括：</p>
+<ul>
+<li>childArgs、childClasspath、sparkConf、childMainClass返回值四元组的定义</li>
+<li>设置cluster manager</li>
+<li>设置deploy mode</li>
+<li>cluster manager的校验，比如类可加在，ApiServer可连接、Fail Through场景等。</li>
+<li>update SparkConf,主要是用命令行参数覆盖SparkConf中的配置</li>
+<li>根据不同cluster manager和deploy mode，下载远程依赖</li>
+<li>赋值mainClass，不同类型的应用是不一样的。</li>
+<li>Python类型应用和R类型应用的特殊处理</li>
+<li>所有参数和命令行选项根据模式和cluster manager写入sparkConf中</li>
+<li>不合法参数的处理</li>
+<li>返回childArgs、childClasspath、sparkConf、childMainClass</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[deploy] def prepareSubmitEnvironment(</span><br><span class="line">    args: SparkSubmitArguments,</span><br><span class="line">    conf: Option[HadoopConfiguration] &#x3D; None)</span><br><span class="line">    : (Seq[String], Seq[String], SparkConf, String) &#x3D; &#123;</span><br><span class="line">  &#x2F;&#x2F; 返回值定义</span><br><span class="line">  val childArgs &#x3D; new ArrayBuffer[String]()</span><br><span class="line">  val childClasspath &#x3D; new ArrayBuffer[String]()</span><br><span class="line">  val sparkConf &#x3D; args.toSparkConf()</span><br><span class="line">  var childMainClass &#x3D; &quot;&quot;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; 设置cluster manager</span><br><span class="line">  val clusterManager: Int &#x3D; args.master match &#123;</span><br><span class="line">    case &quot;yarn&quot; &#x3D;&gt; YARN</span><br><span class="line">    case m if m.startsWith(&quot;spark&quot;) &#x3D;&gt; STANDALONE</span><br><span class="line">    case m if m.startsWith(&quot;mesos&quot;) &#x3D;&gt; MESOS</span><br><span class="line">    case m if m.startsWith(&quot;k8s&quot;) &#x3D;&gt; KUBERNETES</span><br><span class="line">    case m if m.startsWith(&quot;local&quot;) &#x3D;&gt; LOCAL</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; 设置deploy mode; default is client mode</span><br><span class="line">  val deployMode: Int &#x3D; args.deployMode match &#123;</span><br><span class="line">    case &quot;client&quot; | null &#x3D;&gt; CLIENT</span><br><span class="line">    case &quot;cluster&quot; &#x3D;&gt; CLUSTER</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  if (clusterManager &#x3D;&#x3D; YARN) &#123;</span><br><span class="line">    &#x2F;&#x2F; Make sure YARN is included in our build if we&#39;re trying to use it</span><br><span class="line">    ...保证使用得到的类是可以加载的</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  if (clusterManager &#x3D;&#x3D; KUBERNETES) &#123;</span><br><span class="line">    args.master &#x3D; Utils.checkAndGetK8sMasterUrl(args.master)</span><br><span class="line">    &#x2F;&#x2F; Make sure KUBERNETES is included in our build if we&#39;re trying to use it</span><br><span class="line">    ...K8S集群可用</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; Fail fast 场景</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  </span><br><span class="line">  val isYarnCluster &#x3D; clusterManager &#x3D;&#x3D; YARN &amp;&amp; deployMode &#x3D;&#x3D; CLUSTER</span><br><span class="line">  val isMesosCluster &#x3D; clusterManager &#x3D;&#x3D; MESOS &amp;&amp; deployMode &#x3D;&#x3D; CLUSTER</span><br><span class="line">  val isStandAloneCluster &#x3D; clusterManager &#x3D;&#x3D; STANDALONE &amp;&amp; deployMode &#x3D;&#x3D; CLUSTER</span><br><span class="line">  val isKubernetesCluster &#x3D; clusterManager &#x3D;&#x3D; KUBERNETES &amp;&amp; deployMode &#x3D;&#x3D; CLUSTER</span><br><span class="line">  val isKubernetesClient &#x3D; clusterManager &#x3D;&#x3D; KUBERNETES &amp;&amp; deployMode &#x3D;&#x3D; CLIENT</span><br><span class="line">  val isKubernetesClusterModeDriver &#x3D; isKubernetesClient &amp;&amp;</span><br><span class="line">    sparkConf.getBoolean(&quot;spark.kubernetes.submitInDriver&quot;, false)</span><br><span class="line"></span><br><span class="line">  if (!isMesosCluster &amp;&amp; !isStandAloneCluster) &#123;</span><br><span class="line">    ...依赖项的下载</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; update spark config from args</span><br><span class="line">  args.toSparkConf(Option(sparkConf))</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; Resolve glob path for different resources.</span><br><span class="line">  args.jars &#x3D; Option(args.jars).map(resolveGlobPaths(_, hadoopConf)).orNull</span><br><span class="line">  args.files &#x3D; Option(args.files).map(resolveGlobPaths(_, hadoopConf)).orNull</span><br><span class="line">  args.pyFiles &#x3D; Option(args.pyFiles).map(resolveGlobPaths(_, hadoopConf)).orNull</span><br><span class="line">  args.archives &#x3D; Option(args.archives).map(resolveGlobPaths(_, hadoopConf)).orNull</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; In client mode, download remote files.客户端模式需要下载远程文件</span><br><span class="line">  var localPrimaryResource: String &#x3D; null</span><br><span class="line">  var localJars: String &#x3D; null</span><br><span class="line">  var localPyFiles: String &#x3D; null</span><br><span class="line">  if (deployMode &#x3D;&#x3D; CLIENT) &#123;</span><br><span class="line">    localPrimaryResource &#x3D; Option(args.primaryResource).map &#123;</span><br><span class="line">      downloadFile(_, targetDir, sparkConf, hadoopConf)</span><br><span class="line">    &#125;.orNull</span><br><span class="line">    localJars &#x3D; Option(args.jars).map &#123;</span><br><span class="line">      downloadFileList(_, targetDir, sparkConf, hadoopConf)</span><br><span class="line">    &#125;.orNull</span><br><span class="line">    localPyFiles &#x3D; Option(args.pyFiles).map &#123;</span><br><span class="line">      downloadFileList(_, targetDir, sparkConf, hadoopConf)</span><br><span class="line">    &#125;.orNull</span><br><span class="line"></span><br><span class="line">    if (isKubernetesClusterModeDriver) &#123;</span><br><span class="line">      ...特殊处理</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line">  if (clusterManager &#x3D;&#x3D; YARN) &#123;</span><br><span class="line">    ... Yarn模式的特殊处理</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F;开始尝试加载主类</span><br><span class="line">  &#x2F;&#x2F;第一种：java类型</span><br><span class="line">  if (args.mainClass &#x3D;&#x3D; null &amp;&amp; !args.isPython &amp;&amp; !args.isR) &#123;</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F;第二种：python类型</span><br><span class="line">  if (args.isPython &amp;&amp; deployMode &#x3D;&#x3D; CLIENT) &#123;</span><br><span class="line">    if (args.primaryResource &#x3D;&#x3D; PYSPARK_SHELL) &#123;</span><br><span class="line">      args.mainClass &#x3D; &quot;org.apache.spark.api.python.PythonGatewayServer&quot;</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">      ...</span><br><span class="line">      args.mainClass &#x3D; &quot;org.apache.spark.deploy.PythonRunner&quot;</span><br><span class="line">      args.childArgs &#x3D; ArrayBuffer(localPrimaryResource, localPyFiles) ++ args.childArgs</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...&#x2F;&#x2F;Python和R类型的特殊处理</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F;第三种：R类型</span><br><span class="line">  if (args.isR &amp;&amp; deployMode &#x3D;&#x3D; CLIENT) &#123;</span><br><span class="line">    if (args.primaryResource &#x3D;&#x3D; SPARKR_SHELL) &#123;</span><br><span class="line">      args.mainClass &#x3D; &quot;org.apache.spark.api.r.RBackend&quot;</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">      ...</span><br><span class="line">      args.mainClass &#x3D; &quot;org.apache.spark.deploy.RRunner&quot;</span><br><span class="line">      args.childArgs &#x3D; ArrayBuffer(localPrimaryResource) ++ args.childArgs</span><br><span class="line">      args.files &#x3D; mergeFileLists(args.files, args.primaryResource)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...在客户端模式下，直接使用用户提交的主类，依赖的jar都放入cleasspath</span><br><span class="line">  &#x2F;&#x2F; In client mode, launch the application main class directly</span><br><span class="line">  &#x2F;&#x2F; In addition, add the main application jar and any added jars (if any) to the classpath</span><br><span class="line">  if (deployMode &#x3D;&#x3D; CLIENT) &#123;</span><br><span class="line">    childMainClass &#x3D; args.mainClass</span><br><span class="line">    if (localPrimaryResource !&#x3D; null &amp;&amp; isUserJar(localPrimaryResource)) &#123;</span><br><span class="line">      childClasspath +&#x3D; localPrimaryResource</span><br><span class="line">    &#125;</span><br><span class="line">    if (localJars !&#x3D; null) &#123; childClasspath ++&#x3D; localJars.split(&quot;,&quot;) &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line">  &#x2F;&#x2F; Map all arguments to command-line options or system properties for our chosen mode</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; 各种特殊场景的处理</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; In yarn-cluster mode, use yarn.Client as a wrapper around the user class</span><br><span class="line">  &#x2F;&#x2F; 在Yarn Cluster模式下，需要使用yarn.Client作为wrapper包装用户的主类</span><br><span class="line">  if (isYarnCluster) &#123;</span><br><span class="line">    childMainClass &#x3D; YARN_CLUSTER_SUBMIT_CLASS</span><br><span class="line">    if (args.isPython) &#123;</span><br><span class="line">      childArgs +&#x3D; (&quot;--primary-py-file&quot;, args.primaryResource)</span><br><span class="line">      childArgs +&#x3D; (&quot;--class&quot;, &quot;org.apache.spark.deploy.PythonRunner&quot;)</span><br><span class="line">    &#125; else if (args.isR) &#123;</span><br><span class="line">      val mainFile &#x3D; new Path(args.primaryResource).getName</span><br><span class="line">      childArgs +&#x3D; (&quot;--primary-r-file&quot;, mainFile)</span><br><span class="line">      childArgs +&#x3D; (&quot;--class&quot;, &quot;org.apache.spark.deploy.RRunner&quot;)</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">      if (args.primaryResource !&#x3D; SparkLauncher.NO_RESOURCE) &#123;</span><br><span class="line">        childArgs +&#x3D; (&quot;--jar&quot;, args.primaryResource)</span><br><span class="line">      &#125;</span><br><span class="line">      childArgs +&#x3D; (&quot;--class&quot;, args.mainClass)</span><br><span class="line">    &#125;</span><br><span class="line">    if (args.childArgs !&#x3D; null) &#123;</span><br><span class="line">      args.childArgs.foreach &#123; arg &#x3D;&gt; childArgs +&#x3D; (&quot;--arg&quot;, arg) &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  if (isKubernetesCluster) &#123;</span><br><span class="line">    childMainClass &#x3D; KUBERNETES_CLUSTER_SUBMIT_CLASS</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; Load any properties specified through --conf and the default properties file</span><br><span class="line">  for ((k, v) &lt;- args.sparkProperties) &#123;</span><br><span class="line">    sparkConf.setIfMissing(k, v)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line">  (childArgs.toSeq, childClasspath.toSeq, sparkConf, childMainClass)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>在client模式下，childMainClass = args.mainClass</p>
+<p>在Standalone Cluster模式下，childMainClass  = RestSubmissionClientApp | ClientApp</p>
+<p>在Yarn Cluster模式下，childMainClass  = YarnClusterApplication</p>
+<p>在Mesos Cluster模式下，childMainClass  = RestSubmissionClientApp</p>
+<p>在K8S Cluster模式下，childMainClass  = KubernetesClientApplication</p>
+<p>childArgs是childMainClass的参数，childClasspath是childMainClass的classpath。</p>
+<h2 id="SparkApplication-start"><a href="#SparkApplication-start" class="headerlink" title="SparkApplication.start"></a>SparkApplication.start</h2><p>一段来自代码中的注释</p>
+<p><em>Entry point for a Spark application. Implementations must provide a no-argument</em> </p>
+<p><em>constructor.</em></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] trait SparkApplication &#123;</span><br><span class="line">  def start(args: Array[String], conf: SparkConf): Unit</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="KubernetesClientApplication-start"><a href="#KubernetesClientApplication-start" class="headerlink" title="KubernetesClientApplication.start"></a>KubernetesClientApplication.start</h2><p>关于<code>KubernetesClientApplication</code>，一段来自代码中的注释</p>
+<p><em>Main class and entry point of application submission in KUBERNETES mode.</em></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">override def start(args: Array[String], conf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">  val parsedArguments &#x3D; ClientArguments.fromCommandLineArgs(args)</span><br><span class="line">  run(parsedArguments, conf)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这样，我们进入了K8S流程了，具体在K8S中怎么初始化，怎么申请资源，怎么监听资源等，可以继续顺着<code>run</code>方法继续看。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>在Spark中Application是用户编写的Spark应用程序，Driver是驱动执行Spark Application的驱动器，这个驱动器如果位于客户机上，则是client模式，如果位于集群的某个节点上，则是cluster模式。ClusterManager，是一个集群管理器，北向负责跟Driver进行交互，南向负责跟真正的后端交互，比如Yarn、K8S、Mesos等。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark on K8S Demo尝试</title>
+    <url>/2021/03/23/Spark/Spark-On-K8S-7/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><a id="more"></a>
+
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>SparkSession</title>
+    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-1/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。</p>
+<a id="more"></a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark基础系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark RDD</title>
+    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-2/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><a id="more"></a>
+
+
+
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark基础系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>SparkConf</title>
+    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-3/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><a id="more"></a>
+
+
+
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark基础系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>SparkContext</title>
+    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-4/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><a id="more"></a>
+
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark基础系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>SparkEnv机制</title>
+    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-5/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>一段来自代码的注释：</p>
+<p>“ <em>Holds all the runtime environment objects for a running Spark instance (either master or worker),including the serializer, RpcEnv, block manager, map output tracker, etc. Currently Spark code finds the SparkEnv through a global variable, so all the threads can access the same SparkEnv. It can be accessed by SparkEnv.get (e.g. after creating a SparkContext).</em> ”</p>
+<a id="more"></a>
+
+<p>SparkEnv是SparkContext对象中最重要的一个属性，保存着Spark运行实例的所有运行环境信息，包括序列化、RpcEnv，block 管理等。关于SparkContext这个大类我们后续分析。</p>
+<h2 id="SparkEnv"><a href="#SparkEnv" class="headerlink" title="SparkEnv"></a>SparkEnv</h2><p>SparkEnv类的描述</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">@DeveloperApi</span><br><span class="line">class SparkEnv (</span><br><span class="line">    val executorId: String,</span><br><span class="line">    private[spark] val rpcEnv: RpcEnv,</span><br><span class="line">    val serializer: Serializer,</span><br><span class="line">    val closureSerializer: Serializer,</span><br><span class="line">    val serializerManager: SerializerManager,</span><br><span class="line">    val mapOutputTracker: MapOutputTracker,</span><br><span class="line">    val shuffleManager: ShuffleManager,</span><br><span class="line">    val broadcastManager: BroadcastManager,</span><br><span class="line">    val blockManager: BlockManager,</span><br><span class="line">    val securityManager: SecurityManager,</span><br><span class="line">    val metricsSystem: MetricsSystem,</span><br><span class="line">    val memoryManager: MemoryManager,</span><br><span class="line">    val outputCommitCoordinator: OutputCommitCoordinator,</span><br><span class="line">    val conf: SparkConf) extends Logging &#123;</span><br><span class="line">    ...    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>从SparkEnv的类的描述中可以看到SparkEnv一共包含了12个重要的组件</p>
+<ul>
+<li>RpcEnv 各组件间的通信环境信息</li>
+<li>SerializerManager 对象的序列化管理器</li>
+<li>MapOutputTracker 用于跟踪Map阶段任务的输出状态，此状态便于Reduce阶段任务获取地址及中间结果</li>
+<li>ShuffleManager 负责Shuffle操作，包括Shuffle read和Shuffle write</li>
+<li>BroadcastManager 广播变量管理器</li>
+<li>BlockManager 块管理器，在Spark中Block可以理解为RDD的一个Partition</li>
+<li>SecurityManager 主要对账户、权限及身份认证进行设置和管理</li>
+<li>MetricsSystem 监控指标管理</li>
+<li>MemoryManager 内存管理器，可以参考之前的Spark内存管理机制</li>
+<li>OutputCommitCoordinator 确定任务是否可以把输出提到HDFS上</li>
+</ul>
+<p>SparkEnv从逻辑上可以分成DriverEnv还是ExecutorEnv</p>
+<p>从堆栈中可以看到不管是DriverEnv还是ExecutorEnv最终的创建都会执行SparkEnv类中的create方法，正如代码中的注释所描述的：</p>
+<p>“*Helper method to create a SparkEnv for a driver or an executor.*”</p>
+<p><img src="/images/spark/image004.png"></p>
+<p>整个create的过程就是SparkEnv所holds的运行环境信息对应manager的初始过程。</p>
+<h2 id="SparkEnv的创建"><a href="#SparkEnv的创建" class="headerlink" title="SparkEnv的创建"></a>SparkEnv的创建</h2><p>前面章节也说了SparkEnv的创建就是每个组件的创建过程。挑重点学习一下。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">val envInstance &#x3D; new SparkEnv(</span><br><span class="line">  executorId,</span><br><span class="line">  rpcEnv,</span><br><span class="line">  serializer,</span><br><span class="line">  closureSerializer,</span><br><span class="line">  serializerManager,</span><br><span class="line">  mapOutputTracker,</span><br><span class="line">  shuffleManager,</span><br><span class="line">  broadcastManager,</span><br><span class="line">  blockManager,</span><br><span class="line">  securityManager,</span><br><span class="line">  metricsSystem,</span><br><span class="line">  memoryManager,</span><br><span class="line">  outputCommitCoordinator,</span><br><span class="line">  conf)</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; Add a reference to tmp dir created by driver, we will delete this tmp dir when stop() </span><br><span class="line">   is</span><br><span class="line">&#x2F;&#x2F; called, and we only need to do it for driver. Because driver may run as a service, and </span><br><span class="line">   if we</span><br><span class="line">&#x2F;&#x2F; don&#39;t delete this tmp dir when sc is stopped, then will create too many tmp dirs.</span><br><span class="line">if (isDriver) &#123;</span><br><span class="line">  val sparkFilesDir &#x3D; Utils.createTempDir(Utils.getLocalDir(conf), </span><br><span class="line">                                          &quot;userFiles&quot;).getAbsolutePath</span><br><span class="line">  envInstance.driverTmpDir &#x3D; Some(sparkFilesDir)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">envInstance</span><br></pre></td></tr></table></figure>
+<h3 id="广播管理器BroadcastManager"><a href="#广播管理器BroadcastManager" class="headerlink" title="广播管理器BroadcastManager"></a>广播管理器BroadcastManager</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">val broadcastManager &#x3D; new BroadcastManager(isDriver, conf, securityManager)</span><br></pre></td></tr></table></figure>
+<h3 id="Map任务输出跟踪器MapOutputTracker"><a href="#Map任务输出跟踪器MapOutputTracker" class="headerlink" title="Map任务输出跟踪器MapOutputTracker"></a>Map任务输出跟踪器MapOutputTracker</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">val mapOutputTracker &#x3D; if (isDriver) &#123;</span><br><span class="line">  new MapOutputTrackerMaster(conf, broadcastManager, isLocal)</span><br><span class="line">&#125; else &#123;</span><br><span class="line">  new MapOutputTrackerWorker(conf)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; Have to assign trackerEndpoint after initialization as MapOutputTrackerEndpoint</span><br><span class="line">&#x2F;&#x2F; requires the MapOutputTracker itself</span><br><span class="line">mapOutputTracker.trackerEndpoint &#x3D; registerOrLookupEndpoint(MapOutputTracker.ENDPOINT_NAME,</span><br><span class="line">  new MapOutputTrackerMasterEndpoint(</span><br><span class="line">	rpcEnv, mapOutputTracker.asInstanceOf[MapOutputTrackerMaster], conf))</span><br></pre></td></tr></table></figure>
+<h3 id="Shuffle管理器ShuffleManager"><a href="#Shuffle管理器ShuffleManager" class="headerlink" title="Shuffle管理器ShuffleManager"></a>Shuffle管理器ShuffleManager</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;&#x2F; Let the user specify short names for shuffle managers</span><br><span class="line">val shortShuffleMgrNames &#x3D; Map(</span><br><span class="line">  &quot;sort&quot; -&gt; classOf[org.apache.spark.shuffle.sort.SortShuffleManager].getName,</span><br><span class="line">  &quot;tungsten-sort&quot; -&gt; classOf[org.apache.spark.shuffle.sort.SortShuffleManager].getName)</span><br><span class="line">val shuffleMgrName &#x3D; conf.get(config.SHUFFLE_MANAGER)</span><br><span class="line">val shuffleMgrClass &#x3D;</span><br><span class="line">  shortShuffleMgrNames.getOrElse(shuffleMgrName.toLowerCase(Locale.ROOT), shuffleMgrName)</span><br><span class="line">val shuffleManager &#x3D; instantiateClass[ShuffleManager](shuffleMgrClass)</span><br></pre></td></tr></table></figure>
+<h3 id="内存管理器MemoryManager"><a href="#内存管理器MemoryManager" class="headerlink" title="内存管理器MemoryManager"></a>内存管理器MemoryManager</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">val memoryManager: MemoryManager &#x3D; UnifiedMemoryManager(conf, numUsableCores)</span><br></pre></td></tr></table></figure>
+<h3 id="BlockManagerMaster"><a href="#BlockManagerMaster" class="headerlink" title="BlockManagerMaster"></a>BlockManagerMaster</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;&#x2F; Mapping from block manager id to the block manager&#39;s information.</span><br><span class="line">val blockManagerInfo &#x3D; new concurrent.TrieMap[BlockManagerId, BlockManagerInfo]()</span><br><span class="line">val blockManagerMaster &#x3D; new BlockManagerMaster(</span><br><span class="line">  registerOrLookupEndpoint(</span><br><span class="line">	BlockManagerMaster.DRIVER_ENDPOINT_NAME,</span><br><span class="line">	new BlockManagerMasterEndpoint(</span><br><span class="line">	  rpcEnv,</span><br><span class="line">	  isLocal,</span><br><span class="line">	  conf,</span><br><span class="line">	  listenerBus,</span><br><span class="line">	  if (conf.get(config.SHUFFLE_SERVICE_FETCH_RDD_ENABLED)) &#123;</span><br><span class="line">		externalShuffleClient</span><br><span class="line">	  &#125; else &#123;</span><br><span class="line">		None</span><br><span class="line">	  &#125;, blockManagerInfo,</span><br><span class="line">	  mapOutputTracker.asInstanceOf[MapOutputTrackerMaster])),</span><br><span class="line">  registerOrLookupEndpoint(</span><br><span class="line">	BlockManagerMaster.DRIVER_HEARTBEAT_ENDPOINT_NAME,</span><br><span class="line">	new BlockManagerMasterHeartbeatEndpoint(rpcEnv, isLocal, blockManagerInfo)),</span><br><span class="line">  conf,</span><br><span class="line">  isDriver)</span><br></pre></td></tr></table></figure>
+<h3 id="BlockManager"><a href="#BlockManager" class="headerlink" title="BlockManager"></a>BlockManager</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;&#x2F; NB: blockManager is not valid until initialize() is called later.</span><br><span class="line">val blockManager &#x3D; new BlockManager(</span><br><span class="line">  executorId,</span><br><span class="line">  rpcEnv,</span><br><span class="line">  blockManagerMaster,</span><br><span class="line">  serializerManager,</span><br><span class="line">  conf,</span><br><span class="line">  memoryManager,</span><br><span class="line">  mapOutputTracker,</span><br><span class="line">  shuffleManager,</span><br><span class="line">  blockTransferService,</span><br><span class="line">  securityManager,</span><br><span class="line">  externalShuffleClient)</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+<p><a href="https://cnblogs.com/xia520pi/p/8609625.html">SparkEnv详解</a></p>
+]]></content>
+      <categories>
+        <category>Spark基础系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark之Shuffle</title>
+    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-6/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Shuffle过程是进行数据洗牌的过程，由于涉及到了磁盘IO、数据序列化于反序列化、网络IO，所以Shuffle过程是一个非常消耗资源的过程，所以对Shuffle有优化会对大数据计算框架带来显著的性能提升。</p>
+<a id="more"></a>
+
+<p>Shuffle分为write和read两种操作，Map阶段（shuffle write）会将Map Task的结果数据写入到特定地方，比如内存、Disk、第三方存储介质、或者直接push到reduce 端。Reduce阶段（shuffle read）从固定的地方读取数据（前面shuffle write的数据）。</p>
+<h2 id="Shuffle历史"><a href="#Shuffle历史" class="headerlink" title="Shuffle历史"></a>Shuffle历史</h2><p>Spark V1.1 之前使用的是Hash base shuffle</p>
+<p>Spark V1.1 之后使用的是Sort base shuffle</p>
+<p>Spark V1.6 之后Tungsten Sort并入Sort base shuffle</p>
+<p>Spark V2.0 废弃Hash base shuffle</p>
+<p>关于Spark Shuffle 网上有非常多的资料介绍Hash base shuffle以及各种Shuffle机制。由于目前Spark（V3.0）只有Sort base shuffle，所以本文只介绍Sort base shuffle，摒弃过时的分析，减少各类对比，专注目前Spark shuffle的实现。</p>
+<h2 id="ShuffleManager"><a href="#ShuffleManager" class="headerlink" title="ShuffleManager"></a>ShuffleManager</h2><p>一段来自代码的注释：</p>
+<p><em>“ Pluggable interface for shuffle systems. A ShuffleManager is created in SparkEnv on the driver and on each executor, based on the spark.shuffle.manager setting. The driver registers shuffles with it, and executors (or tasks running locally in the driver) can ask to read and write data. ”</em></p>
+<p>这个接口比较简单</p>
+<p><img src="/images/spark/image005.png"></p>
+<p>NOTE:</p>
+<ol>
+<li>This will be instantiated by SparkEnv so its constructor can take a SparkConf and boolean isDriver as parameters.</li>
+<li>This contains a method ShuffleBlockResolver which interacts with External Shuffle Service when it is enabled. Need to pay attention to that, if implementing a custom ShuffleManager, to make sure the custom ShuffleManager could co-exist with External Shuffle Service.</li>
+</ol>
+<h2 id="SortShuffleManager"><a href="#SortShuffleManager" class="headerlink" title="SortShuffleManager"></a>SortShuffleManager</h2><p>ShuffleManager的唯一实现SortShuffleManager</p>
+<p><img src="/images/spark/image006.png"></p>
+<p>最核心的三个操作：</p>
+<ol>
+<li>getWriter（获取Shuffle write的执行器，不同的执行器性能、使用场景、使用条件都不一样）</li>
+<li>getReader （获取Shuffle read的执行器）</li>
+<li>ShuffleBlockResolver-&gt;IndexShuffleBlockResolver （跟External Shuffle Service交互的组件，当然了这个必须是使用了External Shuffle Service的条件下）</li>
+</ol>
+<h3 id="Shuffle-Write"><a href="#Shuffle-Write" class="headerlink" title="Shuffle Write"></a>Shuffle Write</h3><p><em>“Obtained inside a map task to write out records to the shuffle system.”</em></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] abstract class ShuffleWriter[K, V] &#123;</span><br><span class="line">  &#x2F;** Write a sequence of records to this task&#39;s output *&#x2F;</span><br><span class="line">  @throws[IOException]</span><br><span class="line">  def write(records: Iterator[Product2[K, V]]): Unit</span><br><span class="line"></span><br><span class="line">  &#x2F;** Close this writer, passing along whether the map completed *&#x2F;</span><br><span class="line">  def stop(success: Boolean): Option[MapStatus]</span><br><span class="line"></span><br><span class="line">  &#x2F;** Get the lengths of each partition *&#x2F;</span><br><span class="line">  def getPartitionLengths(): Array[Long]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>目前Shuffle write一种有三种</p>
+<ul>
+<li>SortShuffleWriter</li>
+<li>BypassMergeSortShuffleWriter</li>
+<li>UnsafeShuffleWriter</li>
+</ul>
+<p>我们依次分析三种writer的write方法，总结不同之处。</p>
+<h4 id="SortShuffleWriter"><a href="#SortShuffleWriter" class="headerlink" title="SortShuffleWriter"></a>SortShuffleWriter</h4><p>重点分析write方法，代码有精简</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">sorter &#x3D; new ExternalSorter[K, V, C]()</span><br><span class="line"></span><br><span class="line">sorter.insertAll(records)</span><br><span class="line"></span><br><span class="line">val mapOutputWriter &#x3D; shuffleExecutorComponents.createMapOutputWriter(</span><br><span class="line">      dep.shuffleId, mapId, dep.partitioner.numPartitions)</span><br><span class="line">    </span><br><span class="line">sorter.writePartitionedMapOutput(dep.shuffleId, mapId, mapOutputWriter)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<ol>
+<li>创建ExternalSorter类型的sorter对象</li>
+<li>调入insertAll方法写入records</li>
+<li>创建mapOutputWriter</li>
+<li>写入结果数据</li>
+</ol>
+<p>所以对于SortShuffleWriter来说，最重要的ExternalSorter类型的sorter对象。关于它，后续专门分析。</p>
+<h4 id="BypassMergeSortShuffleWriter"><a href="#BypassMergeSortShuffleWriter" class="headerlink" title="BypassMergeSortShuffleWriter"></a>BypassMergeSortShuffleWriter</h4><p>重点分析write方法，代码有精简</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">@Override</span><br><span class="line">public void write(Iterator&lt;Product2&lt;K, V&gt;&gt; records) throws IOException &#123;</span><br><span class="line">  ...</span><br><span class="line">  ShuffleMapOutputWriter mapOutputWriter &#x3D; shuffleExecutorComponents</span><br><span class="line">      .createMapOutputWriter(shuffleId, mapId, numPartitions);</span><br><span class="line">  try &#123;</span><br><span class="line">    ...</span><br><span class="line">    final SerializerInstance serInstance &#x3D; serializer.newInstance();</span><br><span class="line">    final long openStartTime &#x3D; System.nanoTime();</span><br><span class="line">    </span><br><span class="line">    partitionWriters &#x3D; new DiskBlockObjectWriter[numPartitions];</span><br><span class="line">    partitionWriterSegments &#x3D; new FileSegment[numPartitions];</span><br><span class="line">    </span><br><span class="line">    for (int i &#x3D; 0; i &lt; numPartitions; i++) &#123;</span><br><span class="line">      ...</span><br><span class="line">      &#x2F;&#x2F;对每个Partitition创建临时文件和DiskBlockObjectWriter</span><br><span class="line">      final File file &#x3D; tempShuffleBlockIdPlusFile._2();</span><br><span class="line">      partitionWriters[i] &#x3D;</span><br><span class="line">          blockManager.getDiskWriter(blockId, file, serInstance, fileBufferSize, writeMetrics);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;写数据</span><br><span class="line">    while (records.hasNext()) &#123;</span><br><span class="line">      final Product2&lt;K, V&gt; record &#x3D; records.next();</span><br><span class="line">      final K key &#x3D; record._1();</span><br><span class="line">      partitionWriters[partitioner.getPartition(key)].write(key, record._2());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    for (int i &#x3D; 0; i &lt; numPartitions; i++) &#123;</span><br><span class="line">      try (DiskBlockObjectWriter writer &#x3D; partitionWriters[i]) &#123;</span><br><span class="line">        partitionWriterSegments[i] &#x3D; writer.commitAndGet();</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    &#x2F;&#x2F;文件进行了合并</span><br><span class="line">    partitionLengths &#x3D; writePartitionedData(mapOutputWriter);</span><br><span class="line">    </span><br><span class="line">    mapStatus &#x3D; MapStatus$.MODULE$.apply(</span><br><span class="line">      blockManager.shuffleServerId(), partitionLengths, mapId);</span><br><span class="line">  &#125; catch (Exception e) &#123;</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol>
+<li>创建ShuffleMapOutputWriter类型的mapOutputWriter</li>
+<li>针对每个Partition创建临时文件和DiskBlockObjectWriter</li>
+<li>写入所有record</li>
+<li>把所有的临时文件用mapOutputWriter合并，并删除临时文件</li>
+</ol>
+<h4 id="UnsafeShuffleWriter"><a href="#UnsafeShuffleWriter" class="headerlink" title="UnsafeShuffleWriter"></a>UnsafeShuffleWriter</h4><p>重点分析write方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">@Override</span><br><span class="line">public void write(scala.collection.Iterator&lt;Product2&lt;K, V&gt;&gt; records) throws IOException   &#123;</span><br><span class="line">  ...</span><br><span class="line">  boolean success &#x3D; false;</span><br><span class="line">  try &#123;</span><br><span class="line">    while (records.hasNext()) &#123;</span><br><span class="line">      insertRecordIntoSorter(records.next());</span><br><span class="line">    &#125;</span><br><span class="line">    &#x2F;&#x2F;数据最后merge一把，同时生成索引文件</span><br><span class="line">    closeAndWriteOutput();</span><br><span class="line">    success &#x3D; true;</span><br><span class="line">  &#125; finally &#123;</span><br><span class="line">    sorter.cleanupResources();</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol>
+<li>insertRecordIntoSorter,所有record写入sorter</li>
+<li>closeAndWriteOutput</li>
+<li>修改标记</li>
+</ol>
+<p>insertRecordIntoSorter：将数据写入到排序器中</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">void insertRecordIntoSorter(Product2&lt;K, V&gt; record) throws IOException &#123;</span><br><span class="line">  ...</span><br><span class="line">  serBuffer.reset();</span><br><span class="line">  serOutputStream.writeKey(key, OBJECT_CLASS_TAG);</span><br><span class="line">  serOutputStream.writeValue(record._2(), OBJECT_CLASS_TAG);</span><br><span class="line">  serOutputStream.flush();</span><br><span class="line"></span><br><span class="line">  final int serializedRecordSize &#x3D; serBuffer.size();</span><br><span class="line">  ...</span><br><span class="line">  sorter.insertRecord(</span><br><span class="line">    serBuffer.getBuf(), Platform.BYTE_ARRAY_OFFSET, serializedRecordSize, partitionId);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>closeAndWriteOutput: 将所有的临时文件合并成一个文件</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">void closeAndWriteOutput() throws IOException &#123;</span><br><span class="line">  ...</span><br><span class="line">  try &#123;</span><br><span class="line">    partitionLengths &#x3D; mergeSpills(spills);</span><br><span class="line">  &#125; finally &#123;</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">  mapStatus &#x3D; MapStatus$.MODULE$.apply(</span><br><span class="line">    blockManager.shuffleServerId(), partitionLengths, mapId);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><p>SortShuffleWriter包含ExternalSorter、ShuffleMapOutputWriter</p>
+<p>BypassMergeSortShuffleWriter包含ShuffleMapOutputWriter，没有sorter排序器</p>
+<p>UnsafeShuffleWriter包含ShuffleExternalSorter，没有ShuffleMapOutputWriter但是通过ShuffleBlockResolver生成了索引文件。</p>
+<p>三种writer的写入机制不同，使用场景和条件不同，但是最终都会有临时文件的合并操作，合并成一个文件，同时又mapStatus状态的统计、partitionLengths的统计等。</p>
+<h3 id="Shuffle-Read"><a href="#Shuffle-Read" class="headerlink" title="Shuffle Read"></a>Shuffle Read</h3><p>来自代码的注释</p>
+<p><em>“Obtained inside a reduce task to read combined records from the mappers.”</em></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] trait ShuffleReader[K, C] &#123;</span><br><span class="line">  &#x2F;** Read the combined key-values for this reduce task *&#x2F;</span><br><span class="line">  def read(): Iterator[Product2[K, C]]</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; def stop(): Unit</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在目前的Shuffle的实现中，只有一种Shuffle Reader，即：BlockStoreShuffleReader</p>
+<h4 id="BlockStoreShuffleReader"><a href="#BlockStoreShuffleReader" class="headerlink" title="BlockStoreShuffleReader"></a>BlockStoreShuffleReader</h4><p>来自代码的注释</p>
+<p><em>“Fetches and reads the blocks from a shuffle by requesting them from other nodes’ block stores.”</em></p>
+<p>TODO</p>
+<h3 id="ShuffleBlockResolver"><a href="#ShuffleBlockResolver" class="headerlink" title="ShuffleBlockResolver"></a>ShuffleBlockResolver</h3><p>TODO</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark基础系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark MemoryManager</title>
+    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-7/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Spark 作为一个基于内存的分布式计算引擎，其内存管理模块在整个系统中扮演着非常重要的角色。理解 Spark 内存管理的基本原理，有助于更好地开发 Spark 应用程序和进行性能调优。</p>
+<a id="more"></a>
+
+<p>在执行 Spark 的应用程序时，Spark 集群会启动 Driver 和 Executor 两种 JVM 进程，前者为主控进程，负责创建 Spark 上下文，提交 Spark 作业（Job），并将作业转化为计算任务（Task），在各个 Executor 进程间协调任务的调度，后者负责在工作节点上执行具体的计算任务，并将结果返回给 Driver，同时为需要持久化的 RDD 提供存储功能。</p>
+<p>Spark内存管理代码主要代码分布在org.apache.spark.memory包下。</p>
+<h2 id="内存分类"><a href="#内存分类" class="headerlink" title="内存分类"></a>内存分类</h2><p>在Spark中关于内存管理，入口类：<strong>MemoryManager</strong></p>
+<p>从MemoryManager中可以总结出Spark的内存一共有两种划分方式：</p>
+<ol>
+<li><p>从内存的作用来划分（MemoryPool）；</p>
+<p>MemoryPool的子类有ExecutionMemoryPool和StorageMemoryPool，分别用于execution </p>
+<p>memory 和 storage memory的内存池</p>
+</li>
+<li><p>从内存的位置来划分（MemoryAllocator）；</p>
+<p>ON_HEAP memory and OFF_HEAP memory，所以MemoryAllocator的实现类有HeapMemoryAllocator和UnsafeMemoryAllocator</p>
+</li>
+</ol>
+<h2 id="MemoryManager的实现"><a href="#MemoryManager的实现" class="headerlink" title="MemoryManager的实现"></a>MemoryManager的实现</h2><p>UnifiedMemoryManager是目前Spark中唯一的MemoryManager的实现，之前的静态内存管理方案在Spark 1.6中被废弃了。</p>
+<p>MemoryManager定义了主要的内存管理接口</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def acquireStorageMemory(blockId: BlockId, numBytes: Long, memoryMode: MemoryMode): Boolean</span><br><span class="line"></span><br><span class="line">def acquireUnrollMemory(blockId: BlockId, numBytes: Long, memoryMode: MemoryMode): Boolean</span><br><span class="line"></span><br><span class="line">def acquireExecutionMemory(numBytes: Long, taskAttemptId: Long, memoryMode: MemoryMode): Long</span><br><span class="line"></span><br><span class="line">def releaseStorageMemory(numBytes: Long, memoryMode: MemoryMode): Unit</span><br><span class="line"></span><br><span class="line">def releaseExecutionMemory(numBytes: Long, taskAttemptId: Long, memoryMode: MemoryMode): Unit</span><br><span class="line"></span><br><span class="line">def releaseUnrollMemory(numBytes: Long, memoryMode: MemoryMode): Unit</span><br></pre></td></tr></table></figure>
+<p>UnifiedMemoryManager机制</p>
+<ul>
+<li>设定基本的存储内存和执行内存区域（spark.storage.storageFraction 参数），该设定确定了双方各自拥有的空间的范围</li>
+<li>双方的空间都不足时，则存储到硬盘；若己方空间不足而对方空余时，可借用对方的空间;（存储空间不足是指不足以放下一个完整的 Block）</li>
+<li>执行内存的空间被对方占用后，可让对方将占用的部分转存到硬盘，然后”归还”借用的空间</li>
+<li>存储内存的空间被对方占用后，无法让对方”归还”，因为需要考虑 Shuffle 过程中的很多因素，实现起来较为复杂</li>
+</ul>
+<p><img src="/images/spark/image001.png"></p>
+<h2 id="Spark中的内存使用"><a href="#Spark中的内存使用" class="headerlink" title="Spark中的内存使用"></a>Spark中的内存使用</h2><p>在前面Spark内存的分类中，已经了解到Spark的内存按照作用来分，可以分为Execution memory and Storage memory，依次分析如下：</p>
+<h3 id="Execution-memory"><a href="#Execution-memory" class="headerlink" title="Execution memory"></a>Execution memory</h3><p>来自代码的注释：</p>
+<p><em>execution memory refers to that used for computation in shuffles, joins, sorts and aggregations</em></p>
+<p>Execution memory简单点说就是用于Task自身执行过程中使用到的内存和用于shuffle数据的内存。</p>
+<h4 id="Task执行内存"><a href="#Task执行内存" class="headerlink" title="Task执行内存"></a>Task执行内存</h4><p>来自代码的注释：</p>
+<p>“<em>Tries to ensure that each task gets a reasonable share of memory, instead of some task ramping up to a large amount first and then causing others to spill to disk repeatedly.</em><br><em>If there are N tasks, it ensures that each task can acquire at least 1 / 2N of the memory before it has to spill, and at most 1 / N. Because N varies dynamically, we keep track of the set of active tasks and redo the calculations of 1 / 2N and 1 / N in waiting tasks whenever this set changes. This is all done by synchronizing access to mutable state and using wait() and notifyAll() to signal changes to callers. Prior to Spark 1.6, this arbitration of memory across tasks was performed by the ShuffleMemoryManager.</em>“</p>
+<p>Executor 内运行的任务同样共享执行内存，Spark 用一个 HashMap 结构保存了任务到内存耗费的映射。每个任务可占用的执行内存大小的范围为 1/2N ~ 1/N，其中 N 为当前 Executor 内正在运行的任务的个数。每个任务在启动之时，要向 MemoryManager 请求申请最少为 1/2N 的执行内存，如果不能被满足要求则该任务被阻塞，直到有其他任务释放了足够的执行内存，该任务才可以被唤醒。这块儿的内存管理由TaskMemoryManager管理</p>
+<h4 id="Shuffle内存"><a href="#Shuffle内存" class="headerlink" title="Shuffle内存"></a>Shuffle内存</h4><p>关于Shuffle内存这块儿的逻辑，可参考后续Shuffle模块儿的分析</p>
+<h3 id="Storage-memory"><a href="#Storage-memory" class="headerlink" title="Storage memory"></a>Storage memory</h3><p>来自代码的注释：</p>
+<p><em>storage memory refers to that used for caching and propagating internal data across the cluster</em></p>
+<p>Storage memory的设计，可以对缓存 RDD 时使用的内存做统一的规划和管理同时作用于缓存 broadcast 数据。</p>
+<p>RDD的缓存管理由Spark的Storage 模块儿负责实现，其中缓存的级别不仅仅包含内存，还包括Disk、远端存储等，同时还有缓存策略以及淘汰策略等逻辑。可以参考后续博客了解。</p>
+<h2 id="Spark中内存Mode"><a href="#Spark中内存Mode" class="headerlink" title="Spark中内存Mode"></a>Spark中内存Mode</h2><p>在前面Spark内存的分类中，已经了解到Spark的内存位置来分可以分为：ON_HEAP memory and OFF_HEAP memory</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public enum MemoryMode &#123;</span><br><span class="line">  ON_HEAP,</span><br><span class="line">  OFF_HEAP</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>其实就是两种MemoryAllocator</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">MemoryAllocator UNSAFE &#x3D; new UnsafeMemoryAllocator();</span><br><span class="line">MemoryAllocator HEAP &#x3D; new HeapMemoryAllocator();</span><br></pre></td></tr></table></figure>
+<p>MemoryAllocator的接口如下</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">MemoryBlock allocate(long size) throws OutOfMemoryError;</span><br><span class="line">void free(MemoryBlock memory);</span><br></pre></td></tr></table></figure>
+<h3 id="堆内内存"><a href="#堆内内存" class="headerlink" title="堆内内存"></a>堆内内存</h3><p>堆内内存其实就是使用HeapMemoryAllocator进行分配的内存</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;**</span><br><span class="line"> * A simple &#123;@link MemoryAllocator&#125; that can allocate up to 16GB using a JVM long</span><br><span class="line"> * primitive array.</span><br><span class="line"> *&#x2F;</span><br><span class="line">public class HeapMemoryAllocator implements MemoryAllocator &#123;</span><br><span class="line"></span><br><span class="line">  @GuardedBy(&quot;this&quot;)</span><br><span class="line">  private final Map&lt;Long, LinkedList&lt;WeakReference&lt;long[]&gt;&gt;&gt; bufferPoolsBySize &#x3D; new </span><br><span class="line">                                                                        HashMap&lt;&gt;();</span><br><span class="line">  ......  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/spark/image002.png"></p>
+<p>Spark 对堆内内存的管理是一种逻辑上的”规划式”的管理，因为对象实例占用内存的申请和释放都由 JVM 完成，Spark 只能在申请后和释放前 记录 这些内存。Spark是不能精准控制堆内内存的申请和释放，所以不能完全避免内存溢出，只是一定程度的减少了异常的出现。</p>
+<h3 id="堆外内存"><a href="#堆外内存" class="headerlink" title="堆外内存"></a>堆外内存</h3><p>堆内内存其实就是使用UnsafeMemoryAllocator进行分配的内存</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class UnsafeMemoryAllocator implements MemoryAllocator &#123;</span><br><span class="line">  @Override</span><br><span class="line">  public MemoryBlock allocate(long size) throws OutOfMemoryError &#123;</span><br><span class="line">    long address &#x3D; Platform.allocateMemory(size);</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">  @Override</span><br><span class="line">  public void free(MemoryBlock memory) &#123;</span><br><span class="line">    ...</span><br><span class="line">    Platform.freeMemory(memory.offset);</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>其核心是调用Platform中JDK Unsafe API，关于Platform的实现可参考后续博客</p>
+<p><img src="/images/spark/image003.png"></p>
+<p>Spark通过JDK Unsafe API实现了堆外内存的管理, 可以直接操作系统堆外内存，减少了不必要的内存开销，以及频繁的 GC 扫描和回收，提升了处理性能。<a href="https://databricks.com/blog/2015/04/28/project-tungsten-bringing-spark-closer-to-bare-metal.html">具体参考tungsten计划</a></p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本文从MemoryManager（根入口）结合 UnifiedMemoryManager（MemoryManager的唯一实现）的逻辑，从内存位置方面，分析了（ON_HEAP和OFF_HEAP），从内存使用方面，分析了（Execution memory and Storage memory）。</p>
+<p>最核心的当然是MemoryManager，跟MemoryManager的交互却是TaskMemoryManager。</p>
+<p>来自代码的注释：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">                                                       +---------------------------+</span><br><span class="line">+-------------+                                        |       MemoryManager       |</span><br><span class="line">| MemConsumer |----+                                   |                           |</span><br><span class="line">+-------------+    |    +-------------------+          |  +---------------------+  |</span><br><span class="line">                   +---&gt;| TaskMemoryManager |----+     |  |OnHeapStorageMemPool |  |</span><br><span class="line">+-------------+    |    +-------------------+    |     |  +---------------------+  |</span><br><span class="line">| MemConsumer |----+                             |     |                           |</span><br><span class="line">+-------------+         +-------------------+    |     |  +---------------------+  |</span><br><span class="line">                        | TaskMemoryManager |----+     |  |OffHeapStorageMemPool|  |</span><br><span class="line">                        +-------------------+    |     |  +---------------------+  |</span><br><span class="line">                                                 +----&gt;|                           |</span><br><span class="line">                                 *               |     |  +---------------------+  |</span><br><span class="line">                                 *               |     |  |OnHeapExecMemPool    |  |</span><br><span class="line">+-------------+                  *               |     |  +---------------------+  |</span><br><span class="line">| MemConsumer |----+                             |     |                           |</span><br><span class="line">+-------------+    |    +-------------------+    |     |  +---------------------+  |</span><br><span class="line">                   +---&gt;| TaskMemoryManager |----+     |  |OffHeapExecMemPool   |  |</span><br><span class="line">                        +-------------------+          |  +---------------------+  |</span><br><span class="line">                                                       |                           |</span><br><span class="line">                                                       +---------------------------+</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+<p><a href="https://developer.ibm.com/zh/articles/ba-cn-apache-spark-memory-management/">Apache Spark 内存管理详解</a></p>
+]]></content>
+      <categories>
+        <category>Spark基础系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark源码分析系列</title>
+    <url>/2021/03/23/Spark/Spark%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E7%B3%BB%E5%88%97/</url>
+    <content><![CDATA[<h2 id=""><a href="#" class="headerlink" title=""></a></h2><p>Spark源码分析系列是自己在学习Spark过程中的总结和记录，基于Spark3.0版本，一共分为三个子系列</p>
+<a id="more"></a>
+
+<ul>
+<li>Spark基础系列</li>
+<li>Spark On K8S系列</li>
+<li>Spark Application执行过程系列</li>
+</ul>
+<h2 id="Spark基础系列"><a href="#Spark基础系列" class="headerlink" title="Spark基础系列"></a>Spark基础系列</h2><h2 id="Spark-On-K8S系列"><a href="#Spark-On-K8S系列" class="headerlink" title="Spark On K8S系列"></a>Spark On K8S系列</h2><h2 id="Spark-Application执行过程系列"><a href="#Spark-Application执行过程系列" class="headerlink" title="Spark Application执行过程系列"></a>Spark Application执行过程系列</h2><h2 id="约定"><a href="#约定" class="headerlink" title="约定"></a>约定</h2><p>categories：</p>
+<ul>
+<li>Spark</li>
+<li>Spark基础系列</li>
+<li>Spark On K8S系列</li>
+<li>Spark Application执行过程系列</li>
+</ul>
+<p>tags：</p>
+<ul>
+<li>spark</li>
+<li>spark-core</li>
+<li>spark-k8s</li>
+</ul>
+]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark DAGScheduler</title>
+    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-8/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在Spark中有一个核心模块调度器（Scheduler），这个核心模块Scheduler是在SparkContext的创建过程中完成初始化。这个Scheduler是面向应用的调度，跟ClusterManager面向资源的调度是由本质的区别的。</p>
+<a id="more"></a>
+
+<p>Scheduler由两个Level的调度</p>
+<ul>
+<li>DAGScheduler，一个面向Stage的调度，主要功能包括Stage的生成、调度。</li>
+<li>TaskScheduler，一个面向Task的调度，是一个低级别的调度器。</li>
+</ul>
+<p>在Spark中，存在这样的转化关系</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">Application --(1:n)--&gt;  Job --(1:n)--&gt; Stage --(1:n)--&gt; Task</span><br><span class="line">                                         ^               ^</span><br><span class="line">                                         |               |</span><br><span class="line">                                      DAGScheduler   TaskScheduler</span><br></pre></td></tr></table></figure>
+<p>源码目录</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;home&#x2F;penglei&#x2F;Bigdata&#x2F;spark&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;org&#x2F;apache&#x2F;spark&#x2F;scheduler&#x2F;DAGScheduler.scala</span><br></pre></td></tr></table></figure>
+<p>在SparkContext中创建DAGScheduler</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">_dagScheduler &#x3D; new DAGScheduler(this)</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="核心功能"><a href="#核心功能" class="headerlink" title="核心功能"></a>核心功能</h2><p> <em>“Jobs (represented by [[ActiveJob]]) are the top-level work items submitted to the scheduler. For example, when the user calls an action, like count(), a job will be submitted through submitJob. Each Job may require the execution of multiple stages to build intermediate data.“</em></p>
+<p>Jobs作业的管理，每一个action算子产生一个Job，一个SparkSession对应一个SparkContext，一个SparkContext对应一个DAGScheduler，如果Application中有多个action算子的话，会有多个Job产生，即一个DAGScheduler会处理所有Application的Jobs。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[scheduler] val activeJobs &#x3D; new HashSet[ActiveJob]</span><br></pre></td></tr></table></figure>
+
+
+<p> <em>”Stages ([[Stage]]) are sets of tasks that compute intermediate results in jobs, where each task computes the same function on partitions of the same RDD. Stages are separated at shuffle boundaries, which introduce a barrier (where we must wait for the previous stage to finish to fetch outputs). There are two types of stages: [[ResultStage]], for the final stage that executes an action, and [[ShuffleMapStage]], which writes map output files for a shuffle. Stages are often shared across multiple jobs, if these jobs reuse the same RDDs.“</em></p>
+<p>Stage有两种</p>
+<ul>
+<li>ResultStage</li>
+<li>ShuffleMapStage</li>
+</ul>
+<p>Stage的切分（宽窄依赖关系）和调度以及多Jobs间Stage的共享，都是由DAGScheduler来处理。</p>
+<p> <em>”Tasks are individual units of work, each sent to one machine.“</em></p>
+<p>DAGScheduler会为Stage创建对应的TaskSet，然后传给TaskScheduler进行处理。</p>
+<p> <em>”Cache tracking: the DAGScheduler figures out which RDDs are cached to avoid recomputing them and likewise remembers which shuffle map stages have already produced output files to avoid redoing the map side of a shuffle.“</em></p>
+<p>DAGScheduler能够对RDD的cache进行跟踪，避免重复计算，同样shuffle map stage的输出也会尽量重用，避免重复计算。</p>
+<p> <em>”Preferred locations: the DAGScheduler also computes where to run each task in a stage based on the preferred locations of its underlying RDDs, or the location of cached or shuffle data.“</em></p>
+<p>亲和性调度，计算和存储尽量放一起。</p>
+<p> <em>”Cleanup: all data structures are cleared when the running jobs that depend on them finish, to prevent memory leaks in a long-running application.“</em></p>
+<p>资源清理包括缓存和临时数据，避免资源的泄漏</p>
+<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><p>DAGScheduler采用的事件处理机制</p>
+<ul>
+<li><p>eventProcessLoop</p>
+<p>事件接收处理的服务端，接收事件并根据事件的不同的类型做出相应的处理。</p>
+</li>
+<li><p>messageScheduler</p>
+<p>事件的客户端（生产），入参是一个Runnable对象，发送事件给服务端。</p>
+</li>
+</ul>
+<p>简单来说就是一个生产者消费者模型，通过messageScheduler发送事件消息给DAGScheduler，比如Job的完成、Task的一些状态和异常等。DAGScheduler通过eventProcessLoop不停的接收消息处理消息。当然了生产者不仅仅是messageScheduler，还可以绕过messageScheduler，直接使用eventProcessLoop往其queue中放入事件消息。因为messageScheduler传入的Runnable对象其实也是调用eventProcessLoop的方法,区别是messageScheduler可以周期性一直运行产生事件消息。</p>
+<p>在DAGScheduler中还有个listenerBus，listenerBus跟messageScheduler的区别是listenerBus把消息发送到了消息总线上，而messageScheduler仅仅是发送给了DAGScheduler。</p>
+<h3 id="eventProcessLoop"><a href="#eventProcessLoop" class="headerlink" title="eventProcessLoop"></a>eventProcessLoop</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] val eventProcessLoop &#x3D; new DAGSchedulerEventProcessLoop(this)</span><br></pre></td></tr></table></figure>
+<p>在DAGScheduler的构造函数最后，启动了eventProcessLoop线程</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">step1:启动eventProcessLoop</span><br><span class="line">eventProcessLoop.start()</span><br><span class="line"></span><br><span class="line">step2:调用Thread的start方法，进一步调用Tread的run方法</span><br><span class="line">def start(): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    eventThread.start()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">step3:开始监听事件</span><br><span class="line">  private[spark] val eventThread &#x3D; new Thread(name) &#123;</span><br><span class="line">    setDaemon(true)</span><br><span class="line"></span><br><span class="line">    override def run(): Unit &#x3D; &#123;</span><br><span class="line">      ...</span><br><span class="line">      onReceive(event)</span><br><span class="line">      ...</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+<p>DAGSchedulerEventProcessLoop的事件处理</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;**</span><br><span class="line"> * The main event loop of the DAG scheduler.</span><br><span class="line"> *&#x2F;</span><br><span class="line">override def onReceive(event: DAGSchedulerEvent): Unit &#x3D; &#123;</span><br><span class="line">  val timerContext &#x3D; timer.time()</span><br><span class="line">  try &#123;</span><br><span class="line">    doOnReceive(event)</span><br><span class="line">  &#125; finally &#123;</span><br><span class="line">    timerContext.stop()</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>doOnReceive方法：</p>
+<ul>
+<li>JobSubmitted：提交Job事件</li>
+<li>MapStageSubmitted：Map Stage提交事件</li>
+<li>StageCancelled：Stage取消事件</li>
+<li>JobCancelled：Job取消事件</li>
+<li>JobGroupCancelled：Job Group取消事件</li>
+<li>AllJobsCancelled：取消所有Job的事件</li>
+<li>ExecutorAdded：添加Executor的事件</li>
+<li>ExecutorLost：Executor失联事件</li>
+<li>WorkerRemoved：Worker移除事件</li>
+<li>BeginEvent： Task开始执行的事件</li>
+<li>SpeculativeTaskSubmitted： </li>
+<li>UnschedulableTaskSetAdded：在动态资源分配的特性下，添加调度的TaskSet</li>
+<li>UnschedulableTaskSetRemoved：在动态资源分配的特性下，移除调度的TaskSet</li>
+<li>GettingResultEvent： 获取Result事件</li>
+<li>CompletionEvent：完成事件</li>
+<li>TaskSetFailed：TaskSet失败事件</li>
+<li>ResubmitFailedStages：重新提交失败的Stage的事件</li>
+</ul>
+<h3 id="messageScheduler"><a href="#messageScheduler" class="headerlink" title="messageScheduler"></a>messageScheduler</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private val messageScheduler &#x3D;</span><br><span class="line">    ThreadUtils.newDaemonSingleThreadScheduledExecutor(&quot;dag-scheduler-message&quot;)</span><br></pre></td></tr></table></figure>
+<p>example</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">eg—1：</span><br><span class="line">messageScheduler.schedule(</span><br><span class="line">            new Runnable &#123;</span><br><span class="line">              override def run(): Unit &#x3D; eventProcessLoop.post(JobSubmitted(jobId, finalRDD, func,</span><br><span class="line">                partitions, callSite, listener, properties))</span><br><span class="line">            &#125;,</span><br><span class="line">            timeIntervalNumTasksCheck,</span><br><span class="line">            TimeUnit.SECONDS</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">eg-2:</span><br><span class="line">messageScheduler.schedule(</span><br><span class="line">            new Runnable &#123;</span><br><span class="line">              override def run(): Unit &#x3D; eventProcessLoop.post(ResubmitFailedStages)</span><br><span class="line">            &#125;,</span><br><span class="line">            DAGScheduler.RESUBMIT_TIMEOUT,</span><br><span class="line">            TimeUnit.MILLISECONDS</span><br><span class="line">)</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>DAGScheduler采用的事件处理机制，完成其各个功能包括stage的切分和调度，以及Driver和Executor之间的各种事件消息的通信等。这仅仅是整个DAGScheduler的框架，DAGScheduler真正的核心是各种handle方法，包括handleJobSubmitted、handleTaskCompletion等。</p>
+<h2 id="核心Handle方法"><a href="#核心Handle方法" class="headerlink" title="核心Handle方法"></a>核心Handle方法</h2><h3 id="handleJobSubmitted"><a href="#handleJobSubmitted" class="headerlink" title="handleJobSubmitted"></a>handleJobSubmitted</h3><h3 id="handleTaskCompletion"><a href="#handleTaskCompletion" class="headerlink" title="handleTaskCompletion"></a>handleTaskCompletion</h3><h3 id="others"><a href="#others" class="headerlink" title="others"></a>others</h3><p>Toto</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark基础系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>WSL2添加Systemd功能</title>
+    <url>/2021/03/23/WSL2/WSL2%E6%B7%BB%E5%8A%A0Systemd%E5%8A%9F%E8%83%BD/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>WSL2默认是没有systemd服务的，需要自行去安装。</p>
+<a id="more"></a>
+
+<p>Systemd 是 Linux 系统工具，为系统的启动和管理提供一套完整的解决方案。已成为大多数发行版的标准配置。</p>
+<p>根据 Linux 惯例，字母<code>d</code>是守护进程（daemon）的缩写。 Systemd 这个名字的含义，就是它要守护整个系统。</p>
+<p>Systemd 并不是一个命令，而是一组命令，涉及到系统管理的方方面面。</p>
+<h2 id="WLS2安装systemd"><a href="#WLS2安装systemd" class="headerlink" title="WLS2安装systemd"></a>WLS2安装systemd</h2><h3 id="执行命令"><a href="#执行命令" class="headerlink" title="执行命令"></a>执行命令</h3><p><a href="https://github.com/DamionGans/ubuntu-wsl2-systemd-script">https://github.com/DamionGans/ubuntu-wsl2-systemd-script</a></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">git clone https:&#x2F;&#x2F;github.com&#x2F;DamionGans&#x2F;ubuntu-wsl2-systemd-script.git</span><br><span class="line">cd ubuntu-wsl2-systemd-script&#x2F;</span><br><span class="line">bash ubuntu-wsl2-systemd-script.sh</span><br><span class="line"># Enter your password and wait until the script has finished</span><br></pre></td></tr></table></figure>
+<h3 id="验证安装结果"><a href="#验证安装结果" class="headerlink" title="验证安装结果"></a>验证安装结果</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">penglei@PengLei:~$ systemctl --version</span><br><span class="line">systemd 245 (245.4-4ubuntu3.2)</span><br><span class="line">+PAM +AUDIT +SELINUX +IMA +APPARMOR +SMACK +SYSVINIT +UTMP +LIBCRYPTSETUP +GCRYPT +GNUTLS +ACL +XZ +LZ4 +SECCOMP +BLKID +ELFUTILS +KMOD +IDN2 -IDN +PCRE2 default-hierarchy&#x3D;hybrid</span><br><span class="line">penglei@PengLei:~$</span><br></pre></td></tr></table></figure>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>网上有很多文章都介绍了WSL2支持systemd的操作指导，但我觉得ubuntu-wsl2-systemd-script还是非常简单好用，基本上避免了自行安装的很多坑</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="http://www.ruanyifeng.com/blog/2016/03/systemd-tutorial-commands.html">Systemd</a></p>
+]]></content>
+      <categories>
+        <category>Others</category>
+      </categories>
+      <tags>
+        <tag>WSL2</tag>
+        <tag>systemctl</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>WSL2作为Docker后端</title>
+    <url>/2021/03/23/WSL2/WSL2%E4%BD%9C%E4%B8%BADocker%E5%90%8E%E7%AB%AF/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Windows10安装docker的方式有两种: </p>
+<ul>
+<li>原生的Linux安装docker，即在WSL2上安装docker，因为WSL2本质上就是一个Linux内核</li>
+<li>Docker Desktop for windows方式</li>
+</ul>
+<a id="more"></a>
+
+<p>在WSL2下原生Linux安装docker的方式跟完全的Linux虚拟机安装docker类似，区别在于WSL2的Linux不支持systemd，但是可以通过使用官方的get-docker.sh脚本进行安装docker，这样dockerd进程使用ubuntu的init方式启动而不是systemd方式启动。</p>
+<p>本文主要介绍一下Docker Desktop for windows方式</p>
+<h2 id="Docker-Desktop-for-windows方式"><a href="#Docker-Desktop-for-windows方式" class="headerlink" title="Docker Desktop for windows方式"></a>Docker Desktop for windows方式</h2><h3 id="WSL2的安装和配置"><a href="#WSL2的安装和配置" class="headerlink" title="WSL2的安装和配置"></a>WSL2的安装和配置</h3><p>这个网上很多博客包括微软的doc都有介绍</p>
+<p>重点是配置WSL2的systemd功能，可参考之前的博客</p>
+<h3 id="Docker安装"><a href="#Docker安装" class="headerlink" title="Docker安装"></a>Docker安装</h3><ol>
+<li><p>下载Docker Desktop并安装</p>
+<p><a href="https://docs.docker.com/docker-for-windows/wsl/">https://docs.docker.com/docker-for-windows/wsl/</a></p>
+</li>
+<li><p>配置</p>
+</li>
+</ol>
+<p>​      <img src="/images/others/image001.png"></p>
+<p>​      <img src="/images/others/image002.png"></p>
+<p>其实安装挺简单，最后确认一把安装结果即可</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">penglei@PengLei:~$ docker version</span><br><span class="line">Client: Docker Engine - Community</span><br><span class="line"> Cloud integration: 1.0.7</span><br><span class="line"> Version:           20.10.2</span><br><span class="line"> API version:       1.41</span><br><span class="line"> Go version:        go1.13.15</span><br><span class="line"> Git commit:        2291f61</span><br><span class="line"> Built:             Mon Dec 28 16:17:34 2020</span><br><span class="line"> OS&#x2F;Arch:           linux&#x2F;amd64</span><br><span class="line"> Context:           default</span><br><span class="line"> Experimental:      true</span><br><span class="line"></span><br><span class="line">Server: Docker Engine - Community</span><br><span class="line"> Engine:</span><br><span class="line">  Version:          20.10.2</span><br><span class="line">  API version:      1.41 (minimum version 1.12)</span><br><span class="line">  Go version:       go1.13.15</span><br><span class="line">  Git commit:       8891c58</span><br><span class="line">  Built:            Mon Dec 28 16:15:28 2020</span><br><span class="line">  OS&#x2F;Arch:          linux&#x2F;amd64</span><br><span class="line">  Experimental:     false</span><br><span class="line"> containerd:</span><br><span class="line">  Version:          1.4.3</span><br><span class="line">  GitCommit:        269548fa27e0089a8b8278fc4fc781d7f65a939b</span><br><span class="line"> runc:</span><br><span class="line">  Version:          1.0.0-rc92</span><br><span class="line">  GitCommit:        ff819c7e9184c13b7c2607fe6c30ae19403a7aff</span><br><span class="line"> docker-init:</span><br><span class="line">  Version:          0.19.0</span><br><span class="line">  GitCommit:        de40ad0</span><br><span class="line">penglei@PengLei:~$</span><br></pre></td></tr></table></figure>
+<h3 id="为什么选择这种方式"><a href="#为什么选择这种方式" class="headerlink" title="为什么选择这种方式"></a>为什么选择这种方式</h3><p>WSL2原生的Linux内核，完全可以安装Docker了，只需要配置systemd功能，或者使用官方的get-docker.sh的方式就行了，这样不香吗？嗯是挺香的</p>
+<p>但是我喜欢使用WSL2啊，我在Windows上安装我喜欢的IDE，然后通过Remote-WSL，连接WSL很香啊，coding、debug、test</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://docs.docker.com/docker-for-windows/wsl/">WSL2作为Docker后端</a></p>
+]]></content>
+      <categories>
+        <category>Others</category>
+      </categories>
+      <tags>
+        <tag>WSL2</tag>
+        <tag>Docker</tag>
       </tags>
   </entry>
 </search>

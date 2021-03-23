@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"www.mobanche.top","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"./public/search.xml"};
+  </script>
+
+  <meta name="description" content="概述使用spark-submit如何提交一个application到Kubernetes集群使它运行起来，本篇博客将从源码的角度一步步分析整个流程。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark on K8S 运行流程">
+<meta property="og:url" content="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-6/index.html">
+<meta property="og:site_name" content="末班车">
+<meta property="og:description" content="概述使用spark-submit如何提交一个application到Kubernetes集群使它运行起来，本篇博客将从源码的角度一步步分析整个流程。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image014.png">
+<meta property="article:published_time" content="2021-03-23T06:15:57.760Z">
+<meta property="article:modified_time" content="2021-03-23T06:15:16.030Z">
+<meta property="article:author" content="Peng Lei">
+<meta property="article:tag" content="spark">
+<meta property="article:tag" content="k8s">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://www.mobanche.top/images/spark/image014.png">
+
+<link rel="canonical" href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-6/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Spark on K8S 运行流程 | 末班车</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">末班车</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/me.jpg">
+      <meta itemprop="name" content="Peng Lei">
+      <meta itemprop="description" content="壁立千仞.无欲则刚">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="末班车">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Spark on K8S 运行流程
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-03-23 14:15:57 / 修改时间：14:15:16" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Spark/" itemprop="url" rel="index"><span itemprop="name">Spark</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>12k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>使用spark-submit如何提交一个application到Kubernetes集群使它运行起来，本篇博客将从源码的角度一步步分析整个流程。</p>
+<a id="more"></a>
+
+<p>从spark-submit到SparkApplication运行起来的时序如下图所示：</p>
+<p><img src="/images/spark/image014.png" alt="image014"></p>
+<p>我们依次对时序图中的每一个节点进行分析</p>
+<h2 id="spark-submit"><a href="#spark-submit" class="headerlink" title="spark-submit"></a>spark-submit</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">if [ -z &quot;$&#123;SPARK_HOME&#125;&quot; ]; then</span><br><span class="line">  # 设置环境变量</span><br><span class="line">  source &quot;$(dirname &quot;$0&quot;)&quot;&#x2F;find-spark-home</span><br><span class="line">fi</span><br><span class="line"></span><br><span class="line"># disable randomized hash for string in Python 3.3+</span><br><span class="line">export PYTHONHASHSEED&#x3D;0</span><br><span class="line">#调用spark-class脚本执行SparkSubmit类</span><br><span class="line">exec &quot;$&#123;SPARK_HOME&#125;&quot;&#x2F;bin&#x2F;spark-class org.apache.spark.deploy.SparkSubmit &quot;$@&quot;</span><br></pre></td></tr></table></figure>
+<h2 id="spark-class"><a href="#spark-class" class="headerlink" title="spark-class"></a>spark-class</h2><ul>
+<li>加载环境变量</li>
+<li>找到执行RUNNER</li>
+<li>找到Spark的Jar包</li>
+<li>添加launcher到class path中</li>
+<li>调用launcher.Main构造参数</li>
+<li>exec “${CMD[@]}” 执行命令</li>
+</ul>
+<p>通过简单的spark-submit -h看看CMD最后的形式</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;home&#x2F;penglei&#x2F;Tools&#x2F;java&#x2F;jdk&#x2F;bin&#x2F;java -cp &#x2F;home&#x2F;penglei&#x2F;Bigdata&#x2F;spark&#x2F;conf&#x2F;:&#x2F;home&#x2F;penglei&#x2F;Bigdata&#x2F;spark&#x2F;assembly&#x2F;target&#x2F;scala-2.12&#x2F;jars&#x2F;* -Xmx1g org.apache.spark.deploy.SparkSubmit --help</span><br></pre></td></tr></table></figure>
+<p>可以看到就是java -cp 执行类而已</p>
+<h2 id="launcher-Main"><a href="#launcher-Main" class="headerlink" title="launcher.Main"></a>launcher.Main</h2><p>一段来自代码中的注释</p>
+<p><em>Command line interface for the Spark launcher. Used internally by Spark scripts.</em></p>
+<p>在spark-class脚本中构建的CMD就是通过该类实现的。</p>
+<h2 id="SparkSubmit-main"><a href="#SparkSubmit-main" class="headerlink" title="SparkSubmit.main"></a>SparkSubmit.main</h2><p>由spark-class脚本中最后的输出可以看到调用了org.apache.spark.deploy.SparkSubmit，SparkSubmit的main方法如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">override def main(args: Array[String]): Unit &#x3D; &#123;</span><br><span class="line">  val submit &#x3D; new SparkSubmit() &#123;</span><br><span class="line">    self &#x3D;&gt;</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  submit.doSubmit(args)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="SparkSubmit-doSubmit"><a href="#SparkSubmit-doSubmit" class="headerlink" title="SparkSubmit.doSubmit"></a>SparkSubmit.doSubmit</h2><p>可以看到目前SparkSubmit支持的Action一共由四种</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">def doSubmit(args: Array[String]): Unit &#x3D; &#123;</span><br><span class="line">  ...</span><br><span class="line">  appArgs.action match &#123;</span><br><span class="line">    case SparkSubmitAction.SUBMIT &#x3D;&gt; submit(appArgs, uninitLog)</span><br><span class="line">    case SparkSubmitAction.KILL &#x3D;&gt; kill(appArgs)</span><br><span class="line">    case SparkSubmitAction.REQUEST_STATUS &#x3D;&gt; requestStatus(appArgs)</span><br><span class="line">    case SparkSubmitAction.PRINT_VERSION &#x3D;&gt; printVersion()</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="SparkSubmit-submit"><a href="#SparkSubmit-submit" class="headerlink" title="SparkSubmit.submit"></a>SparkSubmit.submit</h2><p>一段来自代码的注释</p>
+<p><em>Submit the application using the provided parameters, ensuring to first wrap in a doAs when –proxy-user is specified.</em></p>
+<p>最终调用的<code>doRunMain</code>方法</p>
+<h2 id="SparkSubmit-doRunMain"><a href="#SparkSubmit-doRunMain" class="headerlink" title="SparkSubmit.doRunMain"></a>SparkSubmit.doRunMain</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">def doRunMain(): Unit &#x3D; &#123;</span><br><span class="line">  if (args.proxyUser !&#x3D; null) &#123;</span><br><span class="line">    ...</span><br><span class="line">    runMain(args, uninitLog)</span><br><span class="line">  &#125; else &#123;</span><br><span class="line">    runMain(args, uninitLog)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>判断是否设置了执行代理用户，然后执行<code>runMain</code>方法</p>
+<h2 id="SparkSubmit-runMain"><a href="#SparkSubmit-runMain" class="headerlink" title="SparkSubmit.runMain"></a>SparkSubmit.runMain</h2><p>一段来自代码中的注释</p>
+<p><em>Run the main method of the child class using the submit arguments. This runs in two steps. First, we prepare the launch environment by setting up the appropriate classpath, system properties, and application arguments for running the child main class based on the cluster manager and the deploy mode. Second, we use this launch environment to invoke the main method of the child main class.</em> </p>
+<p><em>Note that this main class will not be the one provided by the user if we’re running cluster deploy mode or python applications.</em></p>
+<p>这里的child class是指用户提交的Application的class。这个方法涉及两个步骤</p>
+<ul>
+<li>设置launch环境信息，包括classpath、system properties、application arguments for cluster manager以及其他一些参数</li>
+<li>反射加载主类，执行main方法</li>
+</ul>
+<p>用户的Application的class会被包装进JavaMainApplication来调用。</p>
+<p>注意：如果是cluster deploy mode或者python的application的话，此时的main class不是用户提交的类，而是SparkApplication的子类。</p>
+<p>具体关于这个child main class的含义，我们在下面的prepareSumitEnvironment分析。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">private def runMain(args: SparkSubmitArguments, uninitLog: Boolean): Unit &#x3D; &#123;</span><br><span class="line">  &#x2F;&#x2F;step 1,准备launch环境信息</span><br><span class="line">  val (childArgs, childClasspath, sparkConf, childMainClass) &#x3D; prepareSubmitEnvironment(args)</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  var mainClass: Class[_] &#x3D; null</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line">  &#x2F;&#x2F;step2, 反射加载主类，执行main方法</span><br><span class="line">  val app: SparkApplication &#x3D; if (classOf[SparkApplication].isAssignableFrom(mainClass)) &#123;</span><br><span class="line">    mainClass.getConstructor().newInstance().asInstanceOf[SparkApplication]</span><br><span class="line">  &#125; else &#123;</span><br><span class="line">    new JavaMainApplication(mainClass)</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  try &#123;</span><br><span class="line">    app.start(childArgs.toArray, sparkConf)</span><br><span class="line">  &#125; catch &#123;</span><br><span class="line">    case t: Throwable &#x3D;&gt;</span><br><span class="line">      throw findCause(t)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+<h2 id="SparkSubmit-prepareSumitEnvironment"><a href="#SparkSubmit-prepareSumitEnvironment" class="headerlink" title="SparkSubmit.prepareSumitEnvironment"></a>SparkSubmit.prepareSumitEnvironment</h2><p>接着上面，我们分析prepareSubmitEnvironment方法</p>
+<p>一段来自代码中的注释</p>
+<p><em>Prepare the environment for submitting an application.</em></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">@param args the parsed SparkSubmitArguments used for environment preparation.</span><br><span class="line">@param conf the Hadoop Configuration, this argument will only be set in unit test.</span><br><span class="line">@return a 4-tuple:</span><br><span class="line"> (1) the arguments for the child process,</span><br><span class="line"> (2) a list of classpath entries for the child,</span><br><span class="line"> (3) a map of system properties, and</span><br><span class="line"> (4) the main class for the child</span><br></pre></td></tr></table></figure>
+<p>整个函数的逻辑都是围绕处理四个返回值来展开的，主要步骤包括：</p>
+<ul>
+<li>childArgs、childClasspath、sparkConf、childMainClass返回值四元组的定义</li>
+<li>设置cluster manager</li>
+<li>设置deploy mode</li>
+<li>cluster manager的校验，比如类可加在，ApiServer可连接、Fail Through场景等。</li>
+<li>update SparkConf,主要是用命令行参数覆盖SparkConf中的配置</li>
+<li>根据不同cluster manager和deploy mode，下载远程依赖</li>
+<li>赋值mainClass，不同类型的应用是不一样的。</li>
+<li>Python类型应用和R类型应用的特殊处理</li>
+<li>所有参数和命令行选项根据模式和cluster manager写入sparkConf中</li>
+<li>不合法参数的处理</li>
+<li>返回childArgs、childClasspath、sparkConf、childMainClass</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br></pre></td><td class="code"><pre><span class="line">private[deploy] def prepareSubmitEnvironment(</span><br><span class="line">    args: SparkSubmitArguments,</span><br><span class="line">    conf: Option[HadoopConfiguration] &#x3D; None)</span><br><span class="line">    : (Seq[String], Seq[String], SparkConf, String) &#x3D; &#123;</span><br><span class="line">  &#x2F;&#x2F; 返回值定义</span><br><span class="line">  val childArgs &#x3D; new ArrayBuffer[String]()</span><br><span class="line">  val childClasspath &#x3D; new ArrayBuffer[String]()</span><br><span class="line">  val sparkConf &#x3D; args.toSparkConf()</span><br><span class="line">  var childMainClass &#x3D; &quot;&quot;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; 设置cluster manager</span><br><span class="line">  val clusterManager: Int &#x3D; args.master match &#123;</span><br><span class="line">    case &quot;yarn&quot; &#x3D;&gt; YARN</span><br><span class="line">    case m if m.startsWith(&quot;spark&quot;) &#x3D;&gt; STANDALONE</span><br><span class="line">    case m if m.startsWith(&quot;mesos&quot;) &#x3D;&gt; MESOS</span><br><span class="line">    case m if m.startsWith(&quot;k8s&quot;) &#x3D;&gt; KUBERNETES</span><br><span class="line">    case m if m.startsWith(&quot;local&quot;) &#x3D;&gt; LOCAL</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; 设置deploy mode; default is client mode</span><br><span class="line">  val deployMode: Int &#x3D; args.deployMode match &#123;</span><br><span class="line">    case &quot;client&quot; | null &#x3D;&gt; CLIENT</span><br><span class="line">    case &quot;cluster&quot; &#x3D;&gt; CLUSTER</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  if (clusterManager &#x3D;&#x3D; YARN) &#123;</span><br><span class="line">    &#x2F;&#x2F; Make sure YARN is included in our build if we&#39;re trying to use it</span><br><span class="line">    ...保证使用得到的类是可以加载的</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  if (clusterManager &#x3D;&#x3D; KUBERNETES) &#123;</span><br><span class="line">    args.master &#x3D; Utils.checkAndGetK8sMasterUrl(args.master)</span><br><span class="line">    &#x2F;&#x2F; Make sure KUBERNETES is included in our build if we&#39;re trying to use it</span><br><span class="line">    ...K8S集群可用</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; Fail fast 场景</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  </span><br><span class="line">  val isYarnCluster &#x3D; clusterManager &#x3D;&#x3D; YARN &amp;&amp; deployMode &#x3D;&#x3D; CLUSTER</span><br><span class="line">  val isMesosCluster &#x3D; clusterManager &#x3D;&#x3D; MESOS &amp;&amp; deployMode &#x3D;&#x3D; CLUSTER</span><br><span class="line">  val isStandAloneCluster &#x3D; clusterManager &#x3D;&#x3D; STANDALONE &amp;&amp; deployMode &#x3D;&#x3D; CLUSTER</span><br><span class="line">  val isKubernetesCluster &#x3D; clusterManager &#x3D;&#x3D; KUBERNETES &amp;&amp; deployMode &#x3D;&#x3D; CLUSTER</span><br><span class="line">  val isKubernetesClient &#x3D; clusterManager &#x3D;&#x3D; KUBERNETES &amp;&amp; deployMode &#x3D;&#x3D; CLIENT</span><br><span class="line">  val isKubernetesClusterModeDriver &#x3D; isKubernetesClient &amp;&amp;</span><br><span class="line">    sparkConf.getBoolean(&quot;spark.kubernetes.submitInDriver&quot;, false)</span><br><span class="line"></span><br><span class="line">  if (!isMesosCluster &amp;&amp; !isStandAloneCluster) &#123;</span><br><span class="line">    ...依赖项的下载</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; update spark config from args</span><br><span class="line">  args.toSparkConf(Option(sparkConf))</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; Resolve glob path for different resources.</span><br><span class="line">  args.jars &#x3D; Option(args.jars).map(resolveGlobPaths(_, hadoopConf)).orNull</span><br><span class="line">  args.files &#x3D; Option(args.files).map(resolveGlobPaths(_, hadoopConf)).orNull</span><br><span class="line">  args.pyFiles &#x3D; Option(args.pyFiles).map(resolveGlobPaths(_, hadoopConf)).orNull</span><br><span class="line">  args.archives &#x3D; Option(args.archives).map(resolveGlobPaths(_, hadoopConf)).orNull</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; In client mode, download remote files.客户端模式需要下载远程文件</span><br><span class="line">  var localPrimaryResource: String &#x3D; null</span><br><span class="line">  var localJars: String &#x3D; null</span><br><span class="line">  var localPyFiles: String &#x3D; null</span><br><span class="line">  if (deployMode &#x3D;&#x3D; CLIENT) &#123;</span><br><span class="line">    localPrimaryResource &#x3D; Option(args.primaryResource).map &#123;</span><br><span class="line">      downloadFile(_, targetDir, sparkConf, hadoopConf)</span><br><span class="line">    &#125;.orNull</span><br><span class="line">    localJars &#x3D; Option(args.jars).map &#123;</span><br><span class="line">      downloadFileList(_, targetDir, sparkConf, hadoopConf)</span><br><span class="line">    &#125;.orNull</span><br><span class="line">    localPyFiles &#x3D; Option(args.pyFiles).map &#123;</span><br><span class="line">      downloadFileList(_, targetDir, sparkConf, hadoopConf)</span><br><span class="line">    &#125;.orNull</span><br><span class="line"></span><br><span class="line">    if (isKubernetesClusterModeDriver) &#123;</span><br><span class="line">      ...特殊处理</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line">  if (clusterManager &#x3D;&#x3D; YARN) &#123;</span><br><span class="line">    ... Yarn模式的特殊处理</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F;开始尝试加载主类</span><br><span class="line">  &#x2F;&#x2F;第一种：java类型</span><br><span class="line">  if (args.mainClass &#x3D;&#x3D; null &amp;&amp; !args.isPython &amp;&amp; !args.isR) &#123;</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F;第二种：python类型</span><br><span class="line">  if (args.isPython &amp;&amp; deployMode &#x3D;&#x3D; CLIENT) &#123;</span><br><span class="line">    if (args.primaryResource &#x3D;&#x3D; PYSPARK_SHELL) &#123;</span><br><span class="line">      args.mainClass &#x3D; &quot;org.apache.spark.api.python.PythonGatewayServer&quot;</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">      ...</span><br><span class="line">      args.mainClass &#x3D; &quot;org.apache.spark.deploy.PythonRunner&quot;</span><br><span class="line">      args.childArgs &#x3D; ArrayBuffer(localPrimaryResource, localPyFiles) ++ args.childArgs</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...&#x2F;&#x2F;Python和R类型的特殊处理</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F;第三种：R类型</span><br><span class="line">  if (args.isR &amp;&amp; deployMode &#x3D;&#x3D; CLIENT) &#123;</span><br><span class="line">    if (args.primaryResource &#x3D;&#x3D; SPARKR_SHELL) &#123;</span><br><span class="line">      args.mainClass &#x3D; &quot;org.apache.spark.api.r.RBackend&quot;</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">      ...</span><br><span class="line">      args.mainClass &#x3D; &quot;org.apache.spark.deploy.RRunner&quot;</span><br><span class="line">      args.childArgs &#x3D; ArrayBuffer(localPrimaryResource) ++ args.childArgs</span><br><span class="line">      args.files &#x3D; mergeFileLists(args.files, args.primaryResource)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...在客户端模式下，直接使用用户提交的主类，依赖的jar都放入cleasspath</span><br><span class="line">  &#x2F;&#x2F; In client mode, launch the application main class directly</span><br><span class="line">  &#x2F;&#x2F; In addition, add the main application jar and any added jars (if any) to the classpath</span><br><span class="line">  if (deployMode &#x3D;&#x3D; CLIENT) &#123;</span><br><span class="line">    childMainClass &#x3D; args.mainClass</span><br><span class="line">    if (localPrimaryResource !&#x3D; null &amp;&amp; isUserJar(localPrimaryResource)) &#123;</span><br><span class="line">      childClasspath +&#x3D; localPrimaryResource</span><br><span class="line">    &#125;</span><br><span class="line">    if (localJars !&#x3D; null) &#123; childClasspath ++&#x3D; localJars.split(&quot;,&quot;) &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line">  &#x2F;&#x2F; Map all arguments to command-line options or system properties for our chosen mode</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; 各种特殊场景的处理</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; In yarn-cluster mode, use yarn.Client as a wrapper around the user class</span><br><span class="line">  &#x2F;&#x2F; 在Yarn Cluster模式下，需要使用yarn.Client作为wrapper包装用户的主类</span><br><span class="line">  if (isYarnCluster) &#123;</span><br><span class="line">    childMainClass &#x3D; YARN_CLUSTER_SUBMIT_CLASS</span><br><span class="line">    if (args.isPython) &#123;</span><br><span class="line">      childArgs +&#x3D; (&quot;--primary-py-file&quot;, args.primaryResource)</span><br><span class="line">      childArgs +&#x3D; (&quot;--class&quot;, &quot;org.apache.spark.deploy.PythonRunner&quot;)</span><br><span class="line">    &#125; else if (args.isR) &#123;</span><br><span class="line">      val mainFile &#x3D; new Path(args.primaryResource).getName</span><br><span class="line">      childArgs +&#x3D; (&quot;--primary-r-file&quot;, mainFile)</span><br><span class="line">      childArgs +&#x3D; (&quot;--class&quot;, &quot;org.apache.spark.deploy.RRunner&quot;)</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">      if (args.primaryResource !&#x3D; SparkLauncher.NO_RESOURCE) &#123;</span><br><span class="line">        childArgs +&#x3D; (&quot;--jar&quot;, args.primaryResource)</span><br><span class="line">      &#125;</span><br><span class="line">      childArgs +&#x3D; (&quot;--class&quot;, args.mainClass)</span><br><span class="line">    &#125;</span><br><span class="line">    if (args.childArgs !&#x3D; null) &#123;</span><br><span class="line">      args.childArgs.foreach &#123; arg &#x3D;&gt; childArgs +&#x3D; (&quot;--arg&quot;, arg) &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  if (isKubernetesCluster) &#123;</span><br><span class="line">    childMainClass &#x3D; KUBERNETES_CLUSTER_SUBMIT_CLASS</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  &#x2F;&#x2F; Load any properties specified through --conf and the default properties file</span><br><span class="line">  for ((k, v) &lt;- args.sparkProperties) &#123;</span><br><span class="line">    sparkConf.setIfMissing(k, v)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line">  (childArgs.toSeq, childClasspath.toSeq, sparkConf, childMainClass)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>在client模式下，childMainClass = args.mainClass</p>
+<p>在Standalone Cluster模式下，childMainClass  = RestSubmissionClientApp | ClientApp</p>
+<p>在Yarn Cluster模式下，childMainClass  = YarnClusterApplication</p>
+<p>在Mesos Cluster模式下，childMainClass  = RestSubmissionClientApp</p>
+<p>在K8S Cluster模式下，childMainClass  = KubernetesClientApplication</p>
+<p>childArgs是childMainClass的参数，childClasspath是childMainClass的classpath。</p>
+<h2 id="SparkApplication-start"><a href="#SparkApplication-start" class="headerlink" title="SparkApplication.start"></a>SparkApplication.start</h2><p>一段来自代码中的注释</p>
+<p><em>Entry point for a Spark application. Implementations must provide a no-argument</em> </p>
+<p><em>constructor.</em></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">private[spark] trait SparkApplication &#123;</span><br><span class="line">  def start(args: Array[String], conf: SparkConf): Unit</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="KubernetesClientApplication-start"><a href="#KubernetesClientApplication-start" class="headerlink" title="KubernetesClientApplication.start"></a>KubernetesClientApplication.start</h2><p>关于<code>KubernetesClientApplication</code>，一段来自代码中的注释</p>
+<p><em>Main class and entry point of application submission in KUBERNETES mode.</em></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">override def start(args: Array[String], conf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">  val parsedArguments &#x3D; ClientArguments.fromCommandLineArgs(args)</span><br><span class="line">  run(parsedArguments, conf)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这样，我们进入了K8S流程了，具体在K8S中怎么初始化，怎么申请资源，怎么监听资源等，可以继续顺着<code>run</code>方法继续看。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>在Spark中Application是用户编写的Spark应用程序，Driver是驱动执行Spark Application的驱动器，这个驱动器如果位于客户机上，则是client模式，如果位于集群的某个节点上，则是cluster模式。ClusterManager，是一个集群管理器，北向负责跟Driver进行交互，南向负责跟真正的后端交互，比如Yarn、K8S、Mesos等。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a target="_blank" rel="noopener" href="https://github.com/apache/spark">Spark代码</a></p>
+
+    </div>
+
+    
+    
+    
+        <div class="reward-container">
+  <div>您的支持将鼓励我继续创作.</div>
+  <button onclick="var qr = document.getElementById('qr'); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
+    打赏
+  </button>
+  <div id="qr" style="display: none;">
+      
+      <div style="display: inline-block;">
+        <img src="/images/pay/01.jpg" alt="Peng Lei 微信支付">
+        <p>微信支付</p>
+      </div>
+      
+      <div style="display: inline-block;">
+        <img src="/images/pay/02.jpg" alt="Peng Lei 支付宝">
+        <p>支付宝</p>
+      </div>
+
+  </div>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/spark/" rel="tag"># spark</a>
+              <a href="/tags/k8s/" rel="tag"># k8s</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/23/Spark/Spark-On-K8S-5/" rel="prev" title="Spark on K8S Shuffle分析">
+      <i class="fa fa-chevron-left"></i> Spark on K8S Shuffle分析
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-1/" rel="next" title="SparkSession">
+      SparkSession <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A6%82%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#spark-submit"><span class="nav-number">2.</span> <span class="nav-text">spark-submit</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#spark-class"><span class="nav-number">3.</span> <span class="nav-text">spark-class</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#launcher-Main"><span class="nav-number">4.</span> <span class="nav-text">launcher.Main</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SparkSubmit-main"><span class="nav-number">5.</span> <span class="nav-text">SparkSubmit.main</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SparkSubmit-doSubmit"><span class="nav-number">6.</span> <span class="nav-text">SparkSubmit.doSubmit</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SparkSubmit-submit"><span class="nav-number">7.</span> <span class="nav-text">SparkSubmit.submit</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SparkSubmit-doRunMain"><span class="nav-number">8.</span> <span class="nav-text">SparkSubmit.doRunMain</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SparkSubmit-runMain"><span class="nav-number">9.</span> <span class="nav-text">SparkSubmit.runMain</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SparkSubmit-prepareSumitEnvironment"><span class="nav-number">10.</span> <span class="nav-text">SparkSubmit.prepareSumitEnvironment</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">10.1.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SparkApplication-start"><span class="nav-number">11.</span> <span class="nav-text">SparkApplication.start</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#KubernetesClientApplication-start"><span class="nav-number">12.</span> <span class="nav-text">KubernetesClientApplication.start</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">13.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">14.</span> <span class="nav-text">参考</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Peng Lei"
+      src="/images/me.jpg">
+  <p class="site-author-name" itemprop="name">Peng Lei</p>
+  <div class="site-description" itemprop="description">壁立千仞.无欲则刚</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">22</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="mailto:peng.8lei@gmail.com" title="E-Mail → mailto:peng.8lei@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Peng Lei</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">57k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">52 分钟</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+  <script>
+    (function(){
+      var canonicalURL, curProtocol;
+      //Get the <link> tag
+      var x=document.getElementsByTagName("link");
+		//Find the last canonical URL
+		if(x.length > 0){
+			for (i=0;i<x.length;i++){
+				if(x[i].rel.toLowerCase() == 'canonical' && x[i].href){
+					canonicalURL=x[i].href;
+				}
+			}
+		}
+    //Get protocol
+	    if (!canonicalURL){
+	    	curProtocol = window.location.protocol.split(':')[0];
+	    }
+	    else{
+	    	curProtocol = canonicalURL.split(':')[0];
+	    }
+      //Get current URL if the canonical URL does not exist
+	    if (!canonicalURL) canonicalURL = window.location.href;
+	    //Assign script content. Replace current URL with the canonical URL
+      !function(){var e=/([http|https]:\/\/[a-zA-Z0-9\_\.]+\.baidu\.com)/gi,r=canonicalURL,t=document.referrer;if(!e.test(r)){var n=(String(curProtocol).toLowerCase() === 'https')?"https://sp0.baidu.com/9_Q4simg2RQJ8t7jm9iCKT-xh_/s.gif":"//api.share.baidu.com/s.gif";t?(n+="?r="+encodeURIComponent(document.referrer),r&&(n+="&l="+r)):r&&(n+="?l="+r);var i=new Image;i.src=n}}(window);})();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '566a3c91fad003b56198',
+      clientSecret: '347cd7479fcc953935f228ecdf3c6af447e51793',
+      repo        : 'Comments',
+      owner       : 'Peng-Lei',
+      admin       : ['Peng-Lei'],
+      id          : '6849b8a37b01a9c4cb5dd8ffa20a1309',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+</body>
+</html>
