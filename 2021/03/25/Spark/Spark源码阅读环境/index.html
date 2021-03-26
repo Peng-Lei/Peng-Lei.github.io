@@ -20,24 +20,32 @@
     var CONFIG = {"hostname":"www.mobanche.top","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"./public/search.xml"};
   </script>
 
-  <meta name="description" content="概述Spark已经集成了Kuburnetes资源管理框架，集成的方式是在Spark中启动一个客户端跟K8S的ApiServer进行通信，申请和释放资源来运行Driver和Executor。">
+  <meta name="description" content="如何方便的阅读Spark源码以及如何运行调试Example其实是一件比较简单的事情，但是对初学Spark的人来说还是比较复杂，成功的配置好Spark源码阅读环境可以更方便的学习Spark原理。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Spark on K8S Submit分析">
-<meta property="og:url" content="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-2/index.html">
+<meta property="og:title" content="Spark源码阅读环境">
+<meta property="og:url" content="http://www.mobanche.top/2021/03/25/Spark/Spark%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%8E%AF%E5%A2%83/index.html">
 <meta property="og:site_name" content="末班车">
-<meta property="og:description" content="概述Spark已经集成了Kuburnetes资源管理框架，集成的方式是在Spark中启动一个客户端跟K8S的ApiServer进行通信，申请和释放资源来运行Driver和Executor。">
+<meta property="og:description" content="如何方便的阅读Spark源码以及如何运行调试Example其实是一件比较简单的事情，但是对初学Spark的人来说还是比较复杂，成功的配置好Spark源码阅读环境可以更方便的学习Spark原理。">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="http://www.mobanche.top/images/spark/image012.png">
-<meta property="og:image" content="http://www.mobanche.top/images/spark/image007.png">
-<meta property="article:published_time" content="2021-03-23T06:15:57.730Z">
-<meta property="article:modified_time" content="2021-03-23T07:20:17.600Z">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image016.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image017.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image018.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image020.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image021.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image019.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image025.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image022.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image023.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image024.png">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image026.png">
+<meta property="article:published_time" content="2021-03-25T02:54:25.510Z">
+<meta property="article:modified_time" content="2021-03-26T08:40:31.003Z">
 <meta property="article:author" content="Peng Lei">
 <meta property="article:tag" content="spark">
-<meta property="article:tag" content="k8s">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://www.mobanche.top/images/spark/image012.png">
+<meta name="twitter:image" content="http://www.mobanche.top/images/spark/image016.png">
 
-<link rel="canonical" href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-2/">
+<link rel="canonical" href="http://www.mobanche.top/2021/03/25/Spark/Spark%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%8E%AF%E5%A2%83/">
 
 
 <script id="page-configurations">
@@ -50,7 +58,7 @@
   };
 </script>
 
-  <title>Spark on K8S Submit分析 | 末班车</title>
+  <title>Spark源码阅读环境 | 末班车</title>
   
 
 
@@ -198,7 +206,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-2/">
+    <link itemprop="mainEntityOfPage" href="http://www.mobanche.top/2021/03/25/Spark/Spark%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%8E%AF%E5%A2%83/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/me.jpg">
@@ -211,7 +219,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          Spark on K8S Submit分析
+          Spark源码阅读环境
         </h1>
 
         <div class="post-meta">
@@ -220,17 +228,23 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2021-03-23 14:15:57 / 修改时间：15:20:17" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
+              <time title="创建时间：2021-03-25 10:54:25" itemprop="dateCreated datePublished" datetime="2021-03-25T10:54:25+08:00">2021-03-25</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-03-26 16:40:31" itemprop="dateModified" datetime="2021-03-26T16:40:31+08:00">2021-03-26</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
               </span>
               <span class="post-meta-item-text">分类于</span>
                 <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Spark-On-K8S%E7%B3%BB%E5%88%97/" itemprop="url" rel="index"><span itemprop="name">Spark On K8S系列</span></a>
+                  <a href="/categories/Spark/" itemprop="url" rel="index"><span itemprop="name">Spark</span></a>
                 </span>
             </span>
 
@@ -247,14 +261,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>2.5k</span>
+              <span>4.6k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -266,37 +280,63 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Spark已经集成了Kuburnetes资源管理框架，集成的方式是在Spark中启动一个客户端跟K8S的ApiServer进行通信，申请和释放资源来运行Driver和Executor。</p>
+        <p>如何方便的阅读Spark源码以及如何运行调试Example其实是一件比较简单的事情，但是对初学Spark的人来说还是比较复杂，成功的配置好Spark源码阅读环境可以更方便的学习Spark原理。</p>
 <a id="more"></a>
 
-<p>关于submit这块儿的代码位于：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">~&#x2F;Bigdata&#x2F;spark&#x2F;resource-managers&#x2F;kubernetes&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;org&#x2F;apache&#x2F;spark&#x2F;deploy&#x2F;k8s&#x2F;submit</span><br></pre></td></tr></table></figure>
-
-
-<h2 id="核心"><a href="#核心" class="headerlink" title="核心"></a>核心</h2><p>我们先看一张关于submit部分总的分析图</p>
-<p><img src="/images/spark/image012.png"></p>
-<p>从图中可以看出，在submit逻辑中，最核心的是KubernetesClientApplication的处理逻辑。</p>
-<h3 id="KubernetesClientApplication"><a href="#KubernetesClientApplication" class="headerlink" title="KubernetesClientApplication"></a>KubernetesClientApplication</h3><p>一段来自代码中的注释</p>
-<p><em>Main class and entry point of application submission in KUBERNETES mode.</em></p>
-<p>关于如何从spark-submit脚本调用到这里，我们后续在“Spark on K8S 运行流程”分析。</p>
-<ol>
-<li><p>进入start方法，解析参数，调用run方法</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">private[spark] class KubernetesClientApplication extends SparkApplication &#123;</span><br><span class="line"></span><br><span class="line">  override def start(args: Array[String], conf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    val parsedArguments &#x3D; ClientArguments.fromCommandLineArgs(args)</span><br><span class="line">    run(parsedArguments, conf)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  private def run(clientArguments: ClientArguments, sparkConf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    val client &#x3D; new Client(</span><br><span class="line">         kubernetesConf,</span><br><span class="line">         new KubernetesDriverBuilder(),</span><br><span class="line">         kubernetesClient,</span><br><span class="line">         watcher)</span><br><span class="line">       client.run()</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
+<p>本文主要介绍如何在Windows上阅读调试Spark代码, Spark代码版本3+。</p>
+<h2 id="基础配置"><a href="#基础配置" class="headerlink" title="基础配置"></a>基础配置</h2><ul>
+<li>JDK: 1.8 （Windows）</li>
+<li>MAVEN: 3.6.3（Windows）</li>
+<li>SCALA: 2.12.13（Windows）</li>
+<li>IDEA: 2020.3（Windows端,需要安装Scala插件）</li>
+<li>WSL2【Ubuntu： 20.04】 （辅助，代码并不会放到WSL2的子系统上）</li>
+</ul>
+<h2 id="导入IDEA"><a href="#导入IDEA" class="headerlink" title="导入IDEA"></a>导入IDEA</h2><ol>
+<li><p>导入</p>
+<p>先配置一下maven</p>
+<p><img src="/images/spark/image016.png"></p>
+<p>接着导入maven工程</p>
+<p><img src="/images/spark/image017.png"></p>
+<p><img src="/images/spark/image018.png"></p>
 </li>
-<li><p>创建Client对象，调用Client对象的run方法</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line">private[spark] class Client(</span><br><span class="line">    conf: KubernetesDriverConf,</span><br><span class="line">    builder: KubernetesDriverBuilder,</span><br><span class="line">    kubernetesClient: KubernetesClient,</span><br><span class="line">    watcher: LoggingPodStatusWatcher) extends Logging &#123;</span><br><span class="line"></span><br><span class="line">  def run(): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;准备很多参数最终生成PodBuilder[resolvedDriverPod]，然后创建Driver</span><br><span class="line">    var watch: Watch &#x3D; null</span><br><span class="line">    val createdDriverPod &#x3D; kubernetesClient.pods().create(resolvedDriverPod)</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;申请绑定Driver依赖的资源</span><br><span class="line">    try &#123;</span><br><span class="line">      val otherKubernetesResources &#x3D; resolvedDriverSpec.driverKubernetesResources ++ Seq(configMap)</span><br><span class="line">      addOwnerReference(createdDriverPod, otherKubernetesResources)</span><br><span class="line">      kubernetesClient.resourceList(otherKubernetesResources: _*).createOrReplace()</span><br><span class="line">    &#125; catch &#123;</span><br><span class="line">      case NonFatal(e) &#x3D;&gt;</span><br><span class="line">        kubernetesClient.pods().delete(createdDriverPod)</span><br><span class="line">        throw e</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    val sId &#x3D; Seq(conf.namespace, driverPodName).mkString(&quot;:&quot;)</span><br><span class="line">    &#x2F;&#x2F;通过Watcher监控Driver Pod的运行</span><br><span class="line">    breakable &#123;</span><br><span class="line">      while (true) &#123;</span><br><span class="line">        val podWithName &#x3D; kubernetesClient</span><br><span class="line">          .pods()</span><br><span class="line">          .withName(driverPodName)</span><br><span class="line">        watcher.reset()</span><br><span class="line">        watch &#x3D; podWithName.watch(watcher)</span><br><span class="line">        watcher.eventReceived(Action.MODIFIED, podWithName.get())</span><br><span class="line"></span><br><span class="line">        if(watcher.watchOrStop(sId)) &#123;</span><br><span class="line">          watch.close()</span><br><span class="line">          break</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
+<li><p>编译</p>
+<p>这里建议是使用mvn compile，而不是使用idea的build选项</p>
+<p><img src="/images/spark/image020.png"></p>
+<p>这样编译完之后代码的跳转不会有任何问题，包括spark-catalyst</p>
+<p><img src="/images/spark/image021.png"></p>
+<p>整个编译过程如果按着步骤来，肯定不会出现任何问题，因为在idea中，我们使用的是mvn编译，本质上跟git bash或者wsl里执行mvn编译没有区别。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">E:\App\Java\Jdk\bin\java.exe </span><br><span class="line">-Dmaven.multiModuleProjectDirectory&#x3D;E:\Code\spark </span><br><span class="line">-Dmaven.home&#x3D;E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3 </span><br><span class="line">-Dclassworlds.conf&#x3D;E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3\bin\m2.conf </span><br><span class="line">&quot;-Dmaven.ext.class.path&#x3D;E:\App\IntelliJ IDEA 2020.3.3\plugins\maven\lib\maven-event-listener.jar&quot; </span><br><span class="line">&quot;-javaagent:E:\App\IntelliJ IDEA 2020.3.3\lib\idea_rt.jar&#x3D;57479:E:\App\IntelliJ IDEA 2020.3.3\bin&quot; </span><br><span class="line">-Dfile.encoding&#x3D;UTF-8 </span><br><span class="line">-classpath </span><br><span class="line">E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3\boot\plexus-classworlds-2.6.0.jar;E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3\boot\plexus-classworlds.license org.codehaus.classworlds.Launcher </span><br><span class="line">-Didea.version&#x3D;2020.3.3 </span><br><span class="line">-s E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3\conf\settings.xml </span><br><span class="line">-Dmaven.repo.local&#x3D;E:\App\Maven\repository </span><br><span class="line"></span><br><span class="line">###这就是在idea中执行mvn package得到的命令</span><br><span class="line">-DskipTests&#x3D;true package</span><br></pre></td></tr></table></figure></li>
+<li><p>打包</p>
+<p>如果想要在idea中执行example或者调试，那么必须要有jar包，可以参考maven的各个生命周期，此时我们需要执行mvn package。</p>
+<p><img src="/images/spark/image019.png"></p>
 </li>
 </ol>
-<h3 id="LoggingPodStatusWatcher"><a href="#LoggingPodStatusWatcher" class="headerlink" title="LoggingPodStatusWatcher"></a>LoggingPodStatusWatcher</h3><p>LoggingPodStatusWatcher按照配置时间去监听Pod的状态</p>
-<p>一段来自代码的注释</p>
-<p> <em>A monitor for the running Kubernetes pod of a Spark application. Status logging occurs on every state change and also at an interval for liveness.</em></p>
-<h2 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h2><p><img src="/images/spark/image007.png"></p>
-<h3 id="K8sSubmitOp"><a href="#K8sSubmitOp" class="headerlink" title="K8sSubmitOp"></a>K8sSubmitOp</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-24793">SPARK-24793</a>加强了spark-sbumit，更加有利于Application的管理.</p>
-<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a target="_blank" rel="noopener" href="https://github.com/apache/spark">Spark代码</a></p>
-<p><a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/1674883">Spark submit分析</a></p>
+<h2 id="运行example"><a href="#运行example" class="headerlink" title="运行example"></a>运行example</h2><p>我们以SparkPi为例</p>
+<p><img src="/images/spark/image025.png"></p>
+<p>在配置中可以配置一下是否build，这个看个人需求，我是去掉了。</p>
+<p>执行run SparkPi的时候，会发生两个主要错误：</p>
+<ul>
+<li><p>java.lang.ClassNotFoundException: scala.collection.Seq</p>
+<p><img src="/images/spark/image022.png"></p>
+<p>解决办法：</p>
+<p><img src="/images/spark/image023.png"></p>
+</li>
+<li><p>Could not find spark-version-info.properties</p>
+<p><img src="/images/spark/image024.png"></p>
+<p>原因是我们没有使用./build/mvn去编译Spark源码.但是没关系，生成spark-version-info.properties就好了</p>
+<p>解决办法</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">.&#x2F;build&#x2F;spark-build-info .&#x2F;core&#x2F;target&#x2F;scala-2.12&#x2F;classes&#x2F; 3.2.0-SNAPSHOT</span><br></pre></td></tr></table></figure>
+<p>​       </p>
+</li>
+</ul>
+<p>至此我们可以正常运行SparkPi这个Example了，当然也可以debug去看流程。</p>
+<p><img src="/images/spark/image026.png"></p>
+<p>这里有一个小的瑕疵就是hadoop相关的配置没有，但是如果你的应用程序或者运行的Example没有使用到hadoop的相关组件的话，其实是不用理会的。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">java.io.FileNotFoundException: java.io.FileNotFoundException: HADOOP_HOME and hadoop.home.dir are unset. -see https:&#x2F;&#x2F;wiki.apache.org&#x2F;hadoop&#x2F;WindowsProblems</span><br><span class="line">	at org.apache.hadoop.util.Shell.fileNotFoundException(Shell.java:548)</span><br><span class="line">	at org.apache.hadoop.util.Shell.getHadoopHomeDir(Shell.java:569)</span><br><span class="line">	at org.apache.hadoop.util.Shell.getQualifiedBin(Shell.java:592)</span><br><span class="line">	at org.apache.hadoop.util.Shell.&lt;clinit&gt;(Shell.java:689)</span><br><span class="line">	at org.apache.hadoop.util.StringUtils.&lt;clinit&gt;(StringUtils.java:78)</span><br><span class="line">	at org.apache.hadoop.conf.Configuration.getBoolean(Configuration.java:1665)</span><br><span class="line">	at org.apache.hadoop.security.SecurityUtil.setConfigurationInternal(SecurityUtil.java:104)</span><br><span class="line">	at org.apache.hadoop.security.SecurityUtil.&lt;clinit&gt;(SecurityUtil.java:88)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.initialize(UserGroupInformation.java:316)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.ensureInitialized(UserGroupInformation.java:304)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.doSubjectLogin(UserGroupInformation.java:1860)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.createLoginUser(UserGroupInformation.java:718)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.getLoginUser(UserGroupInformation.java:668)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.getCurrentUser(UserGroupInformation.java:579)</span><br><span class="line">	at org.apache.spark.util.Utils$.$anonfun$getCurrentUserName$1(Utils.scala:2485)</span><br><span class="line">	at scala.Option.getOrElse(Option.scala:189)</span><br><span class="line">	at org.apache.spark.util.Utils$.getCurrentUserName(Utils.scala:2485)</span><br><span class="line">	at org.apache.spark.SparkContext.&lt;init&gt;(SparkContext.scala:314)</span><br><span class="line">	at org.apache.spark.SparkContext$.getOrCreate(SparkContext.scala:2696)</span><br><span class="line">	at org.apache.spark.sql.SparkSession$Builder.$anonfun$getOrCreate$2(SparkSession.scala:948)</span><br><span class="line">	at scala.Option.getOrElse(Option.scala:189)</span><br><span class="line">	at org.apache.spark.sql.SparkSession$Builder.getOrCreate(SparkSession.scala:942)</span><br><span class="line">	at org.apache.spark.examples.SparkPi$.main(SparkPi.scala:30)</span><br><span class="line">	at org.apache.spark.examples.SparkPi.main(SparkPi.scala)</span><br><span class="line">Caused by: java.io.FileNotFoundException: HADOOP_HOME and hadoop.home.dir are unset.</span><br><span class="line">	at org.apache.hadoop.util.Shell.checkHadoopHomeInner(Shell.java:468)</span><br><span class="line">	at org.apache.hadoop.util.Shell.checkHadoopHome(Shell.java:439)</span><br><span class="line">	at org.apache.hadoop.util.Shell.&lt;clinit&gt;(Shell.java:516)</span><br><span class="line">	... 20 more</span><br></pre></td></tr></table></figure>
+<p>如果想使用hadoop的相关组件的话，建议在WSL2中安装hadoop，可以参考这个<a target="_blank" rel="noopener" href="https://dev.to/samujjwaal/hadoop-installation-on-windows-10-using-wsl-2ck1">链接</a>，其实有一个坑</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">配置完成后</span><br><span class="line">ssh localhost还是不可以</span><br><span class="line">参考https:&#x2F;&#x2F;unix.stackexchange.com&#x2F;questions&#x2F;487742&#x2F;system-is-booting-up-unprivileged-users-are-not-permitted-to-log-in-yet 来解决</span><br></pre></td></tr></table></figure>
+<p>总的来说，这里我们spark.master=local，对于学习流程来说已经足够了。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本文总结了Spark源码导入IDEA的过程、以及如何使用IDEA去编译、打包Spark源码，同时以SparkPi为例，展示了如何运行和Debug Spark Application，这将很好的帮助我们学习Spark源码。毕竟我们的桌面办公环境大多数都是Windows平台。Just enjoy it。</p>
 
     </div>
 
@@ -327,7 +367,6 @@
       <footer class="post-footer">
           <div class="post-tags">
               <a href="/tags/spark/" rel="tag"># spark</a>
-              <a href="/tags/k8s/" rel="tag"># k8s</a>
           </div>
 
         
@@ -336,13 +375,10 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2021/03/23/Spark/Spark-On-K8S-3/" rel="prev" title="Spark on K8S Feature分析">
-      <i class="fa fa-chevron-left"></i> Spark on K8S Feature分析
+    <a href="/2021/03/23/WSL2/WSL2%E6%B7%BB%E5%8A%A0Systemd%E5%8A%9F%E8%83%BD/" rel="prev" title="WSL2添加Systemd功能">
+      <i class="fa fa-chevron-left"></i> WSL2添加Systemd功能
     </a></div>
-      <div class="post-nav-item">
-    <a href="/2021/03/23/Spark/Spark-On-K8S-4/" rel="next" title="Spark on K8S Scheduler分析">
-      Spark on K8S Scheduler分析 <i class="fa fa-chevron-right"></i>
-    </a></div>
+      <div class="post-nav-item"></div>
     </div>
       </footer>
     
@@ -402,7 +438,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A6%82%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83"><span class="nav-number">2.</span> <span class="nav-text">核心</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#KubernetesClientApplication"><span class="nav-number">2.1.</span> <span class="nav-text">KubernetesClientApplication</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#LoggingPodStatusWatcher"><span class="nav-number">2.2.</span> <span class="nav-text">LoggingPodStatusWatcher</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E4%BB%96"><span class="nav-number">3.</span> <span class="nav-text">其他</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#K8sSubmitOp"><span class="nav-number">3.1.</span> <span class="nav-text">K8sSubmitOp</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">4.</span> <span class="nav-text">参考</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E9%85%8D%E7%BD%AE"><span class="nav-number">1.</span> <span class="nav-text">基础配置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%BC%E5%85%A5IDEA"><span class="nav-number">2.</span> <span class="nav-text">导入IDEA</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%90%E8%A1%8Cexample"><span class="nav-number">3.</span> <span class="nav-text">运行example</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -593,7 +629,7 @@ NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
       repo        : 'Comments',
       owner       : 'Peng-Lei',
       admin       : ['Peng-Lei'],
-      id          : '464300128727449383f03fa0edc91f7b',
+      id          : '5d2eee3a6b167989a7a8f2a87ca56f18',
         language: 'zh-CN',
       distractionFreeMode: true
     });

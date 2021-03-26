@@ -1,18 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>Spark Application</title>
-    <url>/2021/03/23/Spark/Spark-Application-1/</url>
-    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
-]]></content>
-      <categories>
-        <category>Spark Application系列</category>
-      </categories>
-      <tags>
-        <tag>spark</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>Spark on K8S</title>
     <url>/2021/03/23/Spark/Spark-On-K8S-1/</url>
     <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><a id="more"></a>
@@ -40,9 +28,33 @@
 <p>Spark同样提供了docker-image-tool.sh脚本,可以直接用来构建发布Spark的docker image，默认情况下，通过脚本构建的JVM运行环境，可以通过option来更改。</p>
 <p>简而言之，我们需要提供Spark的image，这个image可以使用Spark提供的脚本来创建。</p>
 <h3 id="Cluster-Mode-Command"><a href="#Cluster-Mode-Command" class="headerlink" title="Cluster Mode Command"></a>Cluster Mode Command</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ .&#x2F;bin&#x2F;spark-submit \</span><br><span class="line">    --master k8s:&#x2F;&#x2F;https:&#x2F;&#x2F;&lt;k8s-apiserver-host&gt;:&lt;k8s-apiserver-port&gt; \</span><br><span class="line">    --deploy-mode cluster \</span><br><span class="line">    --name spark-pi \</span><br><span class="line">    --class org.apache.spark.examples.SparkPi \</span><br><span class="line">    --conf spark.executor.instances&#x3D;5 \</span><br><span class="line">    --conf spark.kubernetes.container.image&#x3D;&lt;spark-image&gt; \</span><br><span class="line">    local:&#x2F;&#x2F;&#x2F;path&#x2F;to&#x2F;examples.jar</span><br></pre></td></tr></table></figure>
+<p>–master参数必须是k8s开头，k8s的api server的url的校验可以看checkAndGetK8sMasterUrl函数</p>
+<p>–name执行了Application的name</p>
+<h3 id="Client-Mode"><a href="#Client-Mode" class="headerlink" title="Client Mode"></a>Client Mode</h3><p>Spark2.4.0版本支持client模式，</p>
+<h3 id="Dependency-Management"><a href="#Dependency-Management" class="headerlink" title="Dependency Management"></a>Dependency Management</h3><ul>
+<li>如果依赖项位于HDFS或者HTTP Server上，可以通过正确的URI来使用它们</li>
+<li>可以把依赖项打入的dockerfile中，然后通过local://URI或者设置SPARK_EXTRA_CLASSPATH环境变量来使用，local://scheme是需要在spark-submit中指定的。</li>
+<li>如果依赖项位于本地客户端，则可以使用file://scheme，然后指定上传的位置。官网有个例子</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">...</span><br><span class="line">--packages org.apache.hadoop:hadoop-aws:3.2.2</span><br><span class="line">--conf spark.kubernetes.file.upload.path&#x3D;s3a:&#x2F;&#x2F;&lt;s3-bucket&gt;&#x2F;path</span><br><span class="line">--conf spark.hadoop.fs.s3a.access.key&#x3D;...</span><br><span class="line">--conf spark.hadoop.fs.s3a.impl&#x3D;org.apache.hadoop.fs.s3a.S3AFileSystem</span><br><span class="line">--conf spark.hadoop.fs.s3a.fast.upload&#x3D;true</span><br><span class="line">--conf spark.hadoop.fs.s3a.secret.key&#x3D;....</span><br><span class="line">--conf spark.driver.extraJavaOptions&#x3D;-Divy.cache.dir&#x3D;&#x2F;tmp -Divy.home&#x3D;&#x2F;tmp</span><br><span class="line">file:&#x2F;&#x2F;&#x2F;full&#x2F;path&#x2F;to&#x2F;app.jar</span><br></pre></td></tr></table></figure>
+<p>此时app.jar会被上传到S3，当driver启动后，会下载到driver本地，并设置classpath。</p>
+<h3 id="Pod-模板"><a href="#Pod-模板" class="headerlink" title="Pod 模板"></a>Pod 模板</h3><h3 id="K8S特性"><a href="#K8S特性" class="headerlink" title="K8S特性"></a>K8S特性</h3><ul>
+<li><p>配置文件</p>
+</li>
+<li><p>Contexts</p>
+</li>
+<li><p>Namespace</p>
+</li>
+<li><p>RBAC</p>
+</li>
+</ul>
+<h3 id="Spark-应用程序管理"><a href="#Spark-应用程序管理" class="headerlink" title="Spark 应用程序管理"></a>Spark 应用程序管理</h3><p>可以通过spark-submit CLI工具对运行在k8s中的application进行管理，可以参考<a href="https://issues.apache.org/jira/browse/SPARK-24793">SPARK-24793</a></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">eg1</span><br><span class="line">$ spark-submit --kill spark:spark-pi-1547948636094-driver --master k8s:&#x2F;&#x2F;https:&#x2F;&#x2F;192.168.2.8:8443</span><br><span class="line">eg2</span><br><span class="line">$ spark-submit --status spark:spark-pi-1547948636094-driver --master  k8s:&#x2F;&#x2F;https:&#x2F;&#x2F;192.168.2.8:8443</span><br><span class="line">eg3</span><br><span class="line">$ spark-submit --kill spark:spark-pi* --master  k8s:&#x2F;&#x2F;https:&#x2F;&#x2F;192.168.2.8:8443</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
 
-<h3 id="Dependency-Management"><a href="#Dependency-Management" class="headerlink" title="Dependency Management"></a>Dependency Management</h3><pre><code> curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+
+
+<h3 id="Using-Kubernetes-Volumes"><a href="#Using-Kubernetes-Volumes" class="headerlink" title="Using Kubernetes Volumes"></a>Using Kubernetes Volumes</h3><pre><code> curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
  sudo install minikube-linux-amd64 /usr/local/bin/minikube
 </code></pre>
 <h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
@@ -89,58 +101,6 @@
 <h3 id="K8sSubmitOp"><a href="#K8sSubmitOp" class="headerlink" title="K8sSubmitOp"></a>K8sSubmitOp</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-24793">SPARK-24793</a>加强了spark-sbumit，更加有利于Application的管理.</p>
 <h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
 <p><a href="https://cloud.tencent.com/developer/article/1674883">Spark submit分析</a></p>
-]]></content>
-      <categories>
-        <category>Spark On K8S系列</category>
-      </categories>
-      <tags>
-        <tag>spark</tag>
-        <tag>k8s</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Spark on K8S Feature分析</title>
-    <url>/2021/03/23/Spark/Spark-On-K8S-3/</url>
-    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在Spark App的执行过程中，有两种进程：Driver和Executor，这两种进程都会运行在K8S的Pod中，那么Driver和Executor运行的Pod环境是什么样的呢？又是如何定义呢？这就是feature包的作用了。</p>
-<a id="more"></a>
-
-<p>这篇博客所分析的代码路径</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">~&#x2F;Bigdata&#x2F;spark&#x2F;resource-managers&#x2F;kubernetes&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;org&#x2F;apache&#x2F;spark&#x2F;deploy&#x2F;k8s&#x2F;features</span><br></pre></td></tr></table></figure>
-<h2 id="Driver和Executor的创建"><a href="#Driver和Executor的创建" class="headerlink" title="Driver和Executor的创建"></a>Driver和Executor的创建</h2><h3 id="Driver的创建"><a href="#Driver的创建" class="headerlink" title="Driver的创建"></a>Driver的创建</h3><ol>
-<li><p>KubernetesClientApplication的入口方法start，调用自己的run 方法</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class KubernetesClientApplication extends SparkApplication &#123;</span><br><span class="line"></span><br><span class="line">  override def start(args: Array[String], conf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    val parsedArguments &#x3D; ClientArguments.fromCommandLineArgs(args)</span><br><span class="line">    run(parsedArguments, conf)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  private def run(clientArguments: ClientArguments, sparkConf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">   Utils.tryWithResource(SparkKubernetesClientFactory.createKubernetesClient(</span><br><span class="line">      master,</span><br><span class="line">      Some(kubernetesConf.namespace),</span><br><span class="line">      KUBERNETES_AUTH_SUBMISSION_CONF_PREFIX,</span><br><span class="line">      SparkKubernetesClientFactory.ClientType.Submission,</span><br><span class="line">      sparkConf,</span><br><span class="line">      None,</span><br><span class="line">      None)) &#123; kubernetesClient &#x3D;&gt;</span><br><span class="line">        &#x2F;&#x2F;创建client并运行</span><br><span class="line">        val client &#x3D; new Client(</span><br><span class="line">          kubernetesConf,</span><br><span class="line">          new KubernetesDriverBuilder(),</span><br><span class="line">          kubernetesClient,</span><br><span class="line">          watcher)</span><br><span class="line">        client.run()</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-</li>
-<li><p>Client的run方法创建Driver</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class Client(</span><br><span class="line">    conf: KubernetesDriverConf,</span><br><span class="line">    builder: KubernetesDriverBuilder,</span><br><span class="line">    kubernetesClient: KubernetesClient,</span><br><span class="line">    watcher: LoggingPodStatusWatcher) extends Logging &#123;</span><br><span class="line"></span><br><span class="line">  def run(): Unit &#x3D; &#123;</span><br><span class="line">    &#x2F;&#x2F;重点-&gt; 构建Pod的Spec即buildFromFeatures</span><br><span class="line">    val resolvedDriverSpec &#x3D; builder.buildFromFeatures(conf, kubernetesClient)</span><br><span class="line">    ...</span><br><span class="line">    val resolvedDriverPod &#x3D; new PodBuilder(resolvedDriverSpec.pod.pod)</span><br><span class="line">      .editSpec()</span><br><span class="line">        .addToContainers(resolvedDriverContainer)</span><br><span class="line">        .addNewVolume()</span><br><span class="line">          .withName(SPARK_CONF_VOLUME_DRIVER)</span><br><span class="line">          .withNewConfigMap()</span><br><span class="line">            .withItems(KubernetesClientUtils.buildKeyToPathObjects(confFilesMap).asJava)</span><br><span class="line">            .withName(configMapName)</span><br><span class="line">            .endConfigMap()</span><br><span class="line">          .endVolume()</span><br><span class="line">        .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;调用kubernetesClient去创建Pod</span><br><span class="line">    val createdDriverPod &#x3D; kubernetesClient.pods().create(resolvedDriverPod)</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-</li>
-</ol>
-<p>所以呢？<code>Driver</code>的创建依赖于<code>KubernetesDriverBuilder</code>的<code>buildFromFeatures</code>方法</p>
-<h3 id="Executor的创建"><a href="#Executor的创建" class="headerlink" title="Executor的创建"></a>Executor的创建</h3><ol>
-<li><p>ExecutorPodsAllocator的start方法</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def start(applicationId: String): Unit &#x3D; &#123;</span><br><span class="line">  snapshotsStore.addSubscriber(podAllocationDelay) &#123;</span><br><span class="line">    onNewSnapshots(applicationId, _)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-</li>
-<li><p>ExecutorPodsAllocator的onNewSnapshots方法</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def onNewSnapshots(</span><br><span class="line">    applicationId: String,</span><br><span class="line">    snapshots: Seq[ExecutorPodsSnapshot]): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    if (newlyCreatedExecutorsForRpId.isEmpty</span><br><span class="line">      &amp;&amp; knownPodCount &lt; targetNum) &#123;</span><br><span class="line">      requestNewExecutors(targetNum, knownPodCount, applicationId, rpId)</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-</li>
-<li><p>ExecutorPodsAllocator的requestNewExecutors方法</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def requestNewExecutors(</span><br><span class="line">    expected: Int,</span><br><span class="line">    running: Int,</span><br><span class="line">    applicationId: String,</span><br><span class="line">    resourceProfileId: Int): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    val resolvedExecutorSpec &#x3D; executorBuilder.buildFromFeatures(executorConf, secMgr,</span><br><span class="line">      kubernetesClient, rpIdToResourceProfile(resourceProfileId))      </span><br><span class="line">    ...</span><br><span class="line">    val podWithAttachedContainer &#x3D; new PodBuilder(executorPod.pod)</span><br><span class="line">      .editOrNewSpec()</span><br><span class="line">      .addToContainers(executorPod.container)</span><br><span class="line">      .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    val createdExecutorPod &#x3D; kubernetesClient.pods().create(podWithAttachedContainer)</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">   </span><br></pre></td></tr></table></figure>
-<p>所以呢？<code>Executor</code>的创建依赖于<code>KubernetesExecutorBuilder</code>的<code>buildFromFeatures</code>方法</p>
-</li>
-</ol>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>不管是Driver还是Executor都是通过kubernetesClient客户端调用create的方法创建，只是传入的PodBuilder参数不同，创建时机不同。在构建PodBuilder的过程中，使用了feature包的各种配置进行组装。</p>
-<p><img src="/images/spark/image010.png"></p>
-<h2 id="feature"><a href="#feature" class="headerlink" title="feature"></a>feature</h2><p><img src="/images/spark/image011.png"></p>
-<p>先看一下<code>KubernetesFeatureConfigStep</code>，这个是基础接口，后面的实现类其实非常简单，从类名上基本都识别出功能特性。</p>
-<p>一段来自代码中的注释</p>
-<p> <code>A collection of functions that together represent a &quot;feature&quot; in pods that are launched for Spark drivers and executors.</code></p>
-<p>就是给Spark drivers 和 executors定义运行环境的功能集。如果我们想给它添加特定的运行环境，只需要定义一个功能子类实现<code>KubernetesFeatureConfigStep</code>接口即可。</p>
-<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
-<p><a href="https://cloud.tencent.com/developer/article/1674888">Spark on K8S feature分析</a></p>
 ]]></content>
       <categories>
         <category>Spark On K8S系列</category>
@@ -241,6 +201,58 @@
 
 
 <h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark On K8S系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark on K8S Feature分析</title>
+    <url>/2021/03/23/Spark/Spark-On-K8S-3/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在Spark App的执行过程中，有两种进程：Driver和Executor，这两种进程都会运行在K8S的Pod中，那么Driver和Executor运行的Pod环境是什么样的呢？又是如何定义呢？这就是feature包的作用了。</p>
+<a id="more"></a>
+
+<p>这篇博客所分析的代码路径</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">~&#x2F;Bigdata&#x2F;spark&#x2F;resource-managers&#x2F;kubernetes&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;org&#x2F;apache&#x2F;spark&#x2F;deploy&#x2F;k8s&#x2F;features</span><br></pre></td></tr></table></figure>
+<h2 id="Driver和Executor的创建"><a href="#Driver和Executor的创建" class="headerlink" title="Driver和Executor的创建"></a>Driver和Executor的创建</h2><h3 id="Driver的创建"><a href="#Driver的创建" class="headerlink" title="Driver的创建"></a>Driver的创建</h3><ol>
+<li><p>KubernetesClientApplication的入口方法start，调用自己的run 方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class KubernetesClientApplication extends SparkApplication &#123;</span><br><span class="line"></span><br><span class="line">  override def start(args: Array[String], conf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    val parsedArguments &#x3D; ClientArguments.fromCommandLineArgs(args)</span><br><span class="line">    run(parsedArguments, conf)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  private def run(clientArguments: ClientArguments, sparkConf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">   Utils.tryWithResource(SparkKubernetesClientFactory.createKubernetesClient(</span><br><span class="line">      master,</span><br><span class="line">      Some(kubernetesConf.namespace),</span><br><span class="line">      KUBERNETES_AUTH_SUBMISSION_CONF_PREFIX,</span><br><span class="line">      SparkKubernetesClientFactory.ClientType.Submission,</span><br><span class="line">      sparkConf,</span><br><span class="line">      None,</span><br><span class="line">      None)) &#123; kubernetesClient &#x3D;&gt;</span><br><span class="line">        &#x2F;&#x2F;创建client并运行</span><br><span class="line">        val client &#x3D; new Client(</span><br><span class="line">          kubernetesConf,</span><br><span class="line">          new KubernetesDriverBuilder(),</span><br><span class="line">          kubernetesClient,</span><br><span class="line">          watcher)</span><br><span class="line">        client.run()</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>Client的run方法创建Driver</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class Client(</span><br><span class="line">    conf: KubernetesDriverConf,</span><br><span class="line">    builder: KubernetesDriverBuilder,</span><br><span class="line">    kubernetesClient: KubernetesClient,</span><br><span class="line">    watcher: LoggingPodStatusWatcher) extends Logging &#123;</span><br><span class="line"></span><br><span class="line">  def run(): Unit &#x3D; &#123;</span><br><span class="line">    &#x2F;&#x2F;重点-&gt; 构建Pod的Spec即buildFromFeatures</span><br><span class="line">    val resolvedDriverSpec &#x3D; builder.buildFromFeatures(conf, kubernetesClient)</span><br><span class="line">    ...</span><br><span class="line">    val resolvedDriverPod &#x3D; new PodBuilder(resolvedDriverSpec.pod.pod)</span><br><span class="line">      .editSpec()</span><br><span class="line">        .addToContainers(resolvedDriverContainer)</span><br><span class="line">        .addNewVolume()</span><br><span class="line">          .withName(SPARK_CONF_VOLUME_DRIVER)</span><br><span class="line">          .withNewConfigMap()</span><br><span class="line">            .withItems(KubernetesClientUtils.buildKeyToPathObjects(confFilesMap).asJava)</span><br><span class="line">            .withName(configMapName)</span><br><span class="line">            .endConfigMap()</span><br><span class="line">          .endVolume()</span><br><span class="line">        .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;调用kubernetesClient去创建Pod</span><br><span class="line">    val createdDriverPod &#x3D; kubernetesClient.pods().create(resolvedDriverPod)</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+</li>
+</ol>
+<p>所以呢？<code>Driver</code>的创建依赖于<code>KubernetesDriverBuilder</code>的<code>buildFromFeatures</code>方法</p>
+<h3 id="Executor的创建"><a href="#Executor的创建" class="headerlink" title="Executor的创建"></a>Executor的创建</h3><ol>
+<li><p>ExecutorPodsAllocator的start方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def start(applicationId: String): Unit &#x3D; &#123;</span><br><span class="line">  snapshotsStore.addSubscriber(podAllocationDelay) &#123;</span><br><span class="line">    onNewSnapshots(applicationId, _)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>ExecutorPodsAllocator的onNewSnapshots方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def onNewSnapshots(</span><br><span class="line">    applicationId: String,</span><br><span class="line">    snapshots: Seq[ExecutorPodsSnapshot]): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    if (newlyCreatedExecutorsForRpId.isEmpty</span><br><span class="line">      &amp;&amp; knownPodCount &lt; targetNum) &#123;</span><br><span class="line">      requestNewExecutors(targetNum, knownPodCount, applicationId, rpId)</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>ExecutorPodsAllocator的requestNewExecutors方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def requestNewExecutors(</span><br><span class="line">    expected: Int,</span><br><span class="line">    running: Int,</span><br><span class="line">    applicationId: String,</span><br><span class="line">    resourceProfileId: Int): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    val resolvedExecutorSpec &#x3D; executorBuilder.buildFromFeatures(executorConf, secMgr,</span><br><span class="line">      kubernetesClient, rpIdToResourceProfile(resourceProfileId))      </span><br><span class="line">    ...</span><br><span class="line">    val podWithAttachedContainer &#x3D; new PodBuilder(executorPod.pod)</span><br><span class="line">      .editOrNewSpec()</span><br><span class="line">      .addToContainers(executorPod.container)</span><br><span class="line">      .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    val createdExecutorPod &#x3D; kubernetesClient.pods().create(podWithAttachedContainer)</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">   </span><br></pre></td></tr></table></figure>
+<p>所以呢？<code>Executor</code>的创建依赖于<code>KubernetesExecutorBuilder</code>的<code>buildFromFeatures</code>方法</p>
+</li>
+</ol>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>不管是Driver还是Executor都是通过kubernetesClient客户端调用create的方法创建，只是传入的PodBuilder参数不同，创建时机不同。在构建PodBuilder的过程中，使用了feature包的各种配置进行组装。</p>
+<p><img src="/images/spark/image010.png"></p>
+<h2 id="feature"><a href="#feature" class="headerlink" title="feature"></a>feature</h2><p><img src="/images/spark/image011.png"></p>
+<p>先看一下<code>KubernetesFeatureConfigStep</code>，这个是基础接口，后面的实现类其实非常简单，从类名上基本都识别出功能特性。</p>
+<p>一段来自代码中的注释</p>
+<p> <code>A collection of functions that together represent a &quot;feature&quot; in pods that are launched for Spark drivers and executors.</code></p>
+<p>就是给Spark drivers 和 executors定义运行环境的功能集。如果我们想给它添加特定的运行环境，只需要定义一个功能子类实现<code>KubernetesFeatureConfigStep</code>接口即可。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+<p><a href="https://cloud.tencent.com/developer/article/1674888">Spark on K8S feature分析</a></p>
 ]]></content>
       <categories>
         <category>Spark On K8S系列</category>
@@ -360,6 +372,18 @@
       <tags>
         <tag>spark</tag>
         <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark SQL</title>
+    <url>/2021/03/23/Spark/Spark-SQL-1/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark SQL系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
       </tags>
   </entry>
   <entry>
@@ -753,7 +777,7 @@
 <ul>
 <li>Spark基础系列</li>
 <li>Spark On K8S系列</li>
-<li>Spark Application系列</li>
+<li>Spark SQL系列</li>
 </ul>
 <h2 id="Spark基础系列"><a href="#Spark基础系列" class="headerlink" title="Spark基础系列"></a>Spark基础系列</h2><ul>
 <li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-1/">1</a></li>
@@ -774,7 +798,75 @@
 <li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-6/">Spark on K8S 运行流程</a></li>
 <li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-7/">Spark on K8S Demo尝试</a></li>
 </ul>
-<h2 id="Spark-Application系列"><a href="#Spark-Application系列" class="headerlink" title="Spark Application系列"></a>Spark Application系列</h2>]]></content>
+<h2 id="Spark-SQL系列"><a href="#Spark-SQL系列" class="headerlink" title="Spark SQL系列"></a>Spark SQL系列</h2>]]></content>
+      <categories>
+        <category>Spark</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Spark源码阅读环境</title>
+    <url>/2021/03/25/Spark/Spark%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%8E%AF%E5%A2%83/</url>
+    <content><![CDATA[<p>如何方便的阅读Spark源码以及如何运行调试Example其实是一件比较简单的事情，但是对初学Spark的人来说还是比较复杂，成功的配置好Spark源码阅读环境可以更方便的学习Spark原理。</p>
+<a id="more"></a>
+
+<p>本文主要介绍如何在Windows上阅读调试Spark代码, Spark代码版本3+。</p>
+<h2 id="基础配置"><a href="#基础配置" class="headerlink" title="基础配置"></a>基础配置</h2><ul>
+<li>JDK: 1.8 （Windows）</li>
+<li>MAVEN: 3.6.3（Windows）</li>
+<li>SCALA: 2.12.13（Windows）</li>
+<li>IDEA: 2020.3（Windows端,需要安装Scala插件）</li>
+<li>WSL2【Ubuntu： 20.04】 （辅助，代码并不会放到WSL2的子系统上）</li>
+</ul>
+<h2 id="导入IDEA"><a href="#导入IDEA" class="headerlink" title="导入IDEA"></a>导入IDEA</h2><ol>
+<li><p>导入</p>
+<p>先配置一下maven</p>
+<p><img src="/images/spark/image016.png"></p>
+<p>接着导入maven工程</p>
+<p><img src="/images/spark/image017.png"></p>
+<p><img src="/images/spark/image018.png"></p>
+</li>
+<li><p>编译</p>
+<p>这里建议是使用mvn compile，而不是使用idea的build选项</p>
+<p><img src="/images/spark/image020.png"></p>
+<p>这样编译完之后代码的跳转不会有任何问题，包括spark-catalyst</p>
+<p><img src="/images/spark/image021.png"></p>
+<p>整个编译过程如果按着步骤来，肯定不会出现任何问题，因为在idea中，我们使用的是mvn编译，本质上跟git bash或者wsl里执行mvn编译没有区别。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">E:\App\Java\Jdk\bin\java.exe </span><br><span class="line">-Dmaven.multiModuleProjectDirectory&#x3D;E:\Code\spark </span><br><span class="line">-Dmaven.home&#x3D;E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3 </span><br><span class="line">-Dclassworlds.conf&#x3D;E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3\bin\m2.conf </span><br><span class="line">&quot;-Dmaven.ext.class.path&#x3D;E:\App\IntelliJ IDEA 2020.3.3\plugins\maven\lib\maven-event-listener.jar&quot; </span><br><span class="line">&quot;-javaagent:E:\App\IntelliJ IDEA 2020.3.3\lib\idea_rt.jar&#x3D;57479:E:\App\IntelliJ IDEA 2020.3.3\bin&quot; </span><br><span class="line">-Dfile.encoding&#x3D;UTF-8 </span><br><span class="line">-classpath </span><br><span class="line">E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3\boot\plexus-classworlds-2.6.0.jar;E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3\boot\plexus-classworlds.license org.codehaus.classworlds.Launcher </span><br><span class="line">-Didea.version&#x3D;2020.3.3 </span><br><span class="line">-s E:\App\Maven\apache-maven-3.6.3-bin\apache-maven-3.6.3\conf\settings.xml </span><br><span class="line">-Dmaven.repo.local&#x3D;E:\App\Maven\repository </span><br><span class="line"></span><br><span class="line">###这就是在idea中执行mvn package得到的命令</span><br><span class="line">-DskipTests&#x3D;true package</span><br></pre></td></tr></table></figure></li>
+<li><p>打包</p>
+<p>如果想要在idea中执行example或者调试，那么必须要有jar包，可以参考maven的各个生命周期，此时我们需要执行mvn package。</p>
+<p><img src="/images/spark/image019.png"></p>
+</li>
+</ol>
+<h2 id="运行example"><a href="#运行example" class="headerlink" title="运行example"></a>运行example</h2><p>我们以SparkPi为例</p>
+<p><img src="/images/spark/image025.png"></p>
+<p>在配置中可以配置一下是否build，这个看个人需求，我是去掉了。</p>
+<p>执行run SparkPi的时候，会发生两个主要错误：</p>
+<ul>
+<li><p>java.lang.ClassNotFoundException: scala.collection.Seq</p>
+<p><img src="/images/spark/image022.png"></p>
+<p>解决办法：</p>
+<p><img src="/images/spark/image023.png"></p>
+</li>
+<li><p>Could not find spark-version-info.properties</p>
+<p><img src="/images/spark/image024.png"></p>
+<p>原因是我们没有使用./build/mvn去编译Spark源码.但是没关系，生成spark-version-info.properties就好了</p>
+<p>解决办法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">.&#x2F;build&#x2F;spark-build-info .&#x2F;core&#x2F;target&#x2F;scala-2.12&#x2F;classes&#x2F; 3.2.0-SNAPSHOT</span><br></pre></td></tr></table></figure>
+<p>​       </p>
+</li>
+</ul>
+<p>至此我们可以正常运行SparkPi这个Example了，当然也可以debug去看流程。</p>
+<p><img src="/images/spark/image026.png"></p>
+<p>这里有一个小的瑕疵就是hadoop相关的配置没有，但是如果你的应用程序或者运行的Example没有使用到hadoop的相关组件的话，其实是不用理会的。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">java.io.FileNotFoundException: java.io.FileNotFoundException: HADOOP_HOME and hadoop.home.dir are unset. -see https:&#x2F;&#x2F;wiki.apache.org&#x2F;hadoop&#x2F;WindowsProblems</span><br><span class="line">	at org.apache.hadoop.util.Shell.fileNotFoundException(Shell.java:548)</span><br><span class="line">	at org.apache.hadoop.util.Shell.getHadoopHomeDir(Shell.java:569)</span><br><span class="line">	at org.apache.hadoop.util.Shell.getQualifiedBin(Shell.java:592)</span><br><span class="line">	at org.apache.hadoop.util.Shell.&lt;clinit&gt;(Shell.java:689)</span><br><span class="line">	at org.apache.hadoop.util.StringUtils.&lt;clinit&gt;(StringUtils.java:78)</span><br><span class="line">	at org.apache.hadoop.conf.Configuration.getBoolean(Configuration.java:1665)</span><br><span class="line">	at org.apache.hadoop.security.SecurityUtil.setConfigurationInternal(SecurityUtil.java:104)</span><br><span class="line">	at org.apache.hadoop.security.SecurityUtil.&lt;clinit&gt;(SecurityUtil.java:88)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.initialize(UserGroupInformation.java:316)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.ensureInitialized(UserGroupInformation.java:304)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.doSubjectLogin(UserGroupInformation.java:1860)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.createLoginUser(UserGroupInformation.java:718)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.getLoginUser(UserGroupInformation.java:668)</span><br><span class="line">	at org.apache.hadoop.security.UserGroupInformation.getCurrentUser(UserGroupInformation.java:579)</span><br><span class="line">	at org.apache.spark.util.Utils$.$anonfun$getCurrentUserName$1(Utils.scala:2485)</span><br><span class="line">	at scala.Option.getOrElse(Option.scala:189)</span><br><span class="line">	at org.apache.spark.util.Utils$.getCurrentUserName(Utils.scala:2485)</span><br><span class="line">	at org.apache.spark.SparkContext.&lt;init&gt;(SparkContext.scala:314)</span><br><span class="line">	at org.apache.spark.SparkContext$.getOrCreate(SparkContext.scala:2696)</span><br><span class="line">	at org.apache.spark.sql.SparkSession$Builder.$anonfun$getOrCreate$2(SparkSession.scala:948)</span><br><span class="line">	at scala.Option.getOrElse(Option.scala:189)</span><br><span class="line">	at org.apache.spark.sql.SparkSession$Builder.getOrCreate(SparkSession.scala:942)</span><br><span class="line">	at org.apache.spark.examples.SparkPi$.main(SparkPi.scala:30)</span><br><span class="line">	at org.apache.spark.examples.SparkPi.main(SparkPi.scala)</span><br><span class="line">Caused by: java.io.FileNotFoundException: HADOOP_HOME and hadoop.home.dir are unset.</span><br><span class="line">	at org.apache.hadoop.util.Shell.checkHadoopHomeInner(Shell.java:468)</span><br><span class="line">	at org.apache.hadoop.util.Shell.checkHadoopHome(Shell.java:439)</span><br><span class="line">	at org.apache.hadoop.util.Shell.&lt;clinit&gt;(Shell.java:516)</span><br><span class="line">	... 20 more</span><br></pre></td></tr></table></figure>
+<p>如果想使用hadoop的相关组件的话，建议在WSL2中安装hadoop，可以参考这个<a href="https://dev.to/samujjwaal/hadoop-installation-on-windows-10-using-wsl-2ck1">链接</a>，其实有一个坑</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">配置完成后</span><br><span class="line">ssh localhost还是不可以</span><br><span class="line">参考https:&#x2F;&#x2F;unix.stackexchange.com&#x2F;questions&#x2F;487742&#x2F;system-is-booting-up-unprivileged-users-are-not-permitted-to-log-in-yet 来解决</span><br></pre></td></tr></table></figure>
+<p>总的来说，这里我们spark.master=local，对于学习流程来说已经足够了。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本文总结了Spark源码导入IDEA的过程、以及如何使用IDEA去编译、打包Spark源码，同时以SparkPi为例，展示了如何运行和Debug Spark Application，这将很好的帮助我们学习Spark源码。毕竟我们的桌面办公环境大多数都是Windows平台。Just enjoy it。</p>
+]]></content>
       <categories>
         <category>Spark</category>
       </categories>
