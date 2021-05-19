@@ -14,21 +14,22 @@
 
 
 <link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"www.mobanche.top","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"./public/search.xml"};
+    var CONFIG = {"hostname":"www.mobanche.top","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"./public/search.xml"};
   </script>
 
-  <meta name="description" content="概述从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。">
+  <meta name="description" content="从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="SparkSession">
 <meta property="og:url" content="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-1/index.html">
 <meta property="og:site_name" content="末班车">
-<meta property="og:description" content="概述从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。">
+<meta property="og:description" content="从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2021-03-23T06:15:57.770Z">
-<meta property="article:modified_time" content="2021-03-23T06:15:16.030Z">
+<meta property="article:modified_time" content="2021-03-27T09:27:53.750Z">
 <meta property="article:author" content="Peng Lei">
 <meta property="article:tag" content="spark">
 <meta name="twitter:card" content="summary">
@@ -216,10 +217,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2021-03-23 14:15:57 / 修改时间：14:15:16" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
+              <time title="创建时间：2021-03-23 14:15:57" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-03-27 17:27:53" itemprop="dateModified" datetime="2021-03-27T17:27:53+08:00">2021-03-27</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -243,14 +250,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>127</span>
+              <span>5.1k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -262,27 +269,62 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。</p>
+        <p>从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。</p>
 <a id="more"></a>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+<p>以SparkPi为例</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">object SparkPi &#123;</span><br><span class="line">  def main(args: Array[String]): Unit &#x3D; &#123;</span><br><span class="line">    val spark &#x3D; SparkSession</span><br><span class="line">      .builder</span><br><span class="line">      .appName(&quot;Spark Pi&quot;)</span><br><span class="line">      .getOrCreate()</span><br><span class="line">    val slices &#x3D; if (args.length &gt; 0) args(0).toInt else 2</span><br><span class="line">    val n &#x3D; math.min(100000L * slices, Int.MaxValue).toInt &#x2F;&#x2F; avoid overflow</span><br><span class="line">    val count &#x3D; spark.sparkContext.parallelize(1 until n, slices).map &#123; i &#x3D;&gt;</span><br><span class="line">      val x &#x3D; random * 2 - 1</span><br><span class="line">      val y &#x3D; random * 2 - 1</span><br><span class="line">      if (x*x + y*y &lt;&#x3D; 1) 1 else 0</span><br><span class="line">    &#125;.reduce(_ + _)</span><br><span class="line">    println(s&quot;Pi is roughly $&#123;4.0 * count &#x2F; (n - 1)&#125;&quot;)</span><br><span class="line">    spark.stop()</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看出SparkSession是使用Spark功能API的入口，采用的builder模式进行创建和使用</p>
+<h2 id="Builder模式"><a href="#Builder模式" class="headerlink" title="Builder模式"></a>Builder模式</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">val spark &#x3D; SparkSession.builder</span><br></pre></td></tr></table></figure>
+<p>其实就是返回了一个Builder对象</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">def builder(): Builder &#x3D; new Builder</span><br></pre></td></tr></table></figure>
+<p>在SparkSession的伴生对象中，有一个内部类Builder的定义</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">class Builder extends Logging &#123;</span><br><span class="line"></span><br><span class="line">    private[this] val options &#x3D; new scala.collection.mutable.HashMap[String, String]</span><br><span class="line"></span><br><span class="line">    private[this] val extensions &#x3D; new SparkSessionExtensions</span><br><span class="line"></span><br><span class="line">    ...</span><br><span class="line">    </span><br><span class="line">    def getOrCreate(): SparkSession &#x3D; synchronized</span><br><span class="line">    ...</span><br><span class="line">&#125;    </span><br></pre></td></tr></table></figure>
+<p>可以看到Builder重要的功能点包括：</p>
+<ul>
+<li>设置options</li>
+<li>设置extensions（扩展SparkSession属性）</li>
+<li>获取或创建SparkSession</li>
+</ul>
+<h3 id="设置options"><a href="#设置options" class="headerlink" title="设置options"></a>设置options</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">def config(key: String, value: String): Builder &#x3D; synchronized &#123;</span><br><span class="line">      options +&#x3D; key -&gt; value</span><br><span class="line">      this</span><br><span class="line">&#125;</span><br><span class="line">...</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>各种重载的config方法</p>
+<h3 id="设置extensions"><a href="#设置extensions" class="headerlink" title="设置extensions"></a>设置extensions</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;**</span><br><span class="line"> * Inject extensions into the [[SparkSession]]. This allows a user to add Analyzer rules,</span><br><span class="line"> * Optimizer rules, Planning Strategies or a customized parser.</span><br><span class="line"> *</span><br><span class="line"> * @since 2.2.0</span><br><span class="line"> *&#x2F;</span><br><span class="line">def withExtensions(f: SparkSessionExtensions &#x3D;&gt; Unit): Builder &#x3D; synchronized &#123;</span><br><span class="line">  f(extensions)</span><br><span class="line">  this</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>从注释上可以看到，扩展SparkSession，主要目的是允许用户添加分析器规则、优化器规则、执行计划策略和解析器。</p>
+<h3 id="获取或创建SparkSession"><a href="#获取或创建SparkSession" class="headerlink" title="获取或创建SparkSession"></a>获取或创建SparkSession</h3><p>一段来自代码中的注释</p>
+<p><em>Gets an existing [[SparkSession]] or, if there is no existing one, creates a new one based on the options set in this builder. This method first checks whether there is a valid thread-local SparkSession, and if yes, return that one. It then checks whether there is a valid global default SparkSession, and if yes, return that one. If no valid global default SparkSession exists, the method creates a new SparkSession and assigns the newly created SparkSession as the global default. In case an existing SparkSession is returned, the non-static config options specified in this builder will be applied to the existing SparkSession.</em></p>
+<p>获取或创建一个SparkSession，如果存在可用的SparkSession的话，返回SparkSession并config动态配置，否则创建新的SparkSession</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line">def getOrCreate(): SparkSession &#x3D; synchronized &#123;</span><br><span class="line">      &#x2F;&#x2F;生成SparkConf</span><br><span class="line">      val sparkConf &#x3D; new SparkConf()</span><br><span class="line">      options.foreach &#123; case (k, v) &#x3D;&gt; sparkConf.set(k, v) &#125;</span><br><span class="line">      ...</span><br><span class="line">      &#x2F;&#x2F; Get the session from current thread&#39;s active session.</span><br><span class="line">      &#x2F;&#x2F; 返回当前Thread可用的SparkSession</span><br><span class="line">      var session &#x3D; activeThreadSession.get()</span><br><span class="line">      if ((session ne null) &amp;&amp; !session.sparkContext.isStopped) &#123;</span><br><span class="line">        applyModifiableSettings(session)</span><br><span class="line">        return session</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      &#x2F;&#x2F; Global synchronization so we will only set the default session once.</span><br><span class="line">      &#x2F;&#x2F; 获取全局可用的SparkSession或者创建SparkSession</span><br><span class="line">      SparkSession.synchronized &#123;</span><br><span class="line">        &#x2F;&#x2F; If the current thread does not have an active session, get it from the global session.</span><br><span class="line">        &#x2F;&#x2F; 获取全局可用的SparkSession</span><br><span class="line">        session &#x3D; defaultSession.get()</span><br><span class="line">        if ((session ne null) &amp;&amp; !session.sparkContext.isStopped) &#123;</span><br><span class="line">          applyModifiableSettings(session)</span><br><span class="line">          return session</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        &#x2F;&#x2F; No active nor global default session. Create a new one.</span><br><span class="line">        &#x2F;&#x2F; 创建SparkSession：分Step1、Step2、Step3</span><br><span class="line">        &#x2F;&#x2F; Step1: 创建SparkContext</span><br><span class="line">        val sparkContext &#x3D; userSuppliedContext.getOrElse &#123;</span><br><span class="line">          &#x2F;&#x2F; set a random app name if not given.</span><br><span class="line">          if (!sparkConf.contains(&quot;spark.app.name&quot;)) &#123;</span><br><span class="line">            sparkConf.setAppName(java.util.UUID.randomUUID().toString)</span><br><span class="line">          &#125;</span><br><span class="line"></span><br><span class="line">          SparkContext.getOrCreate(sparkConf)</span><br><span class="line">          &#x2F;&#x2F; Do not update &#96;SparkConf&#96; for existing &#96;SparkContext&#96;, as it&#39;s shared by all sessions.</span><br><span class="line">        &#125;</span><br><span class="line">        &#x2F;&#x2F; Step2: 应用扩展特性</span><br><span class="line">        applyExtensions(</span><br><span class="line">          sparkContext.getConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS).getOrElse(Seq.empty),</span><br><span class="line">          extensions)</span><br><span class="line">        &#x2F;&#x2F; Step3: 创建SparkSession</span><br><span class="line">        session &#x3D; new SparkSession(sparkContext, None, None, extensions, options.toMap)</span><br><span class="line">        setDefaultSession(session)</span><br><span class="line">        setActiveSession(session)</span><br><span class="line">        registerContextListener(sparkContext)</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      return session</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<h2 id="SparkSession伴生类"><a href="#SparkSession伴生类" class="headerlink" title="SparkSession伴生类"></a>SparkSession伴生类</h2><p><em>The entry point to programming Spark with the Dataset and DataFrame API.</em></p>
+<p>从上面的getOrCreate方法，我们可以了解到</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">new SparkSession(sparkContext, None, None, extensions, options.toMap)</span><br></pre></td></tr></table></figure>
+<p>SparkSession入参有5个</p>
+<ul>
+<li>SparkContext： Spark上下文</li>
+<li>Option[SharedState] ： 如果提供，则使用现有的共享状态</li>
+<li>Option[SessionState]： 如果提供，继承会话状态，包括临时视图、SQL配置、UDF等。</li>
+<li>SparkSessionExtensions： 扩展特性</li>
+<li>Map[String, String] ： 配置conf集合</li>
+</ul>
+<h3 id="SharedState"><a href="#SharedState" class="headerlink" title="SharedState"></a>SharedState</h3><p><em>A class that holds all state shared across sessions in a given [[SQLContext]].</em></p>
+<p>基于给定的SQLContext来维护所有跨session共享的状态。</p>
+<h3 id="SessionState"><a href="#SessionState" class="headerlink" title="SessionState"></a>SessionState</h3><p><em>A class that holds all session-specific state in a given [[SparkSession]].</em></p>
+<p>维护给定的SparkSession的session级别的状态。</p>
+<ul>
+<li>sharedState 跨会话共享的状态，如全局视图、外部的catalog</li>
+<li>conf SQL的KV配置</li>
+<li>experimentalMethods 实验方法接口，用于添加自定义规则策略和优化器</li>
+<li>functionRegistry 函数注册目录，用于管理用户注册的函数</li>
+<li>udfRegistration UDF注册接口，用于注册用户自定义函数</li>
+<li>catalogBuilder 用于创建内部目录管理表和DB</li>
+<li>sqlParser SQL解析器</li>
+<li>analyzerBuilder SQL分析器构建器</li>
+<li>optimizerBuilder SQL优化器</li>
+<li>planner SQL执行计划</li>
+<li>streamingQueryManagerBuilder 流查询管理器的Builder</li>
+<li>resourceLoaderBuilder 资源加载器，用于加载跨session共享的jar或者文件</li>
+<li>createQueryExecution 创建QueryExecution的函数对象</li>
+<li>createClone 创建session副本的函数对象</li>
+</ul>
 <h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a target="_blank" rel="noopener" href="https://github.com/apache/spark">Spark代码</a></p>
 
     </div>
@@ -388,7 +430,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A6%82%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">2.</span> <span class="nav-text">参考</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Builder%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.</span> <span class="nav-text">Builder模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AEoptions"><span class="nav-number">1.1.</span> <span class="nav-text">设置options</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AEextensions"><span class="nav-number">1.2.</span> <span class="nav-text">设置extensions</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E6%88%96%E5%88%9B%E5%BB%BASparkSession"><span class="nav-number">1.3.</span> <span class="nav-text">获取或创建SparkSession</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SparkSession%E4%BC%B4%E7%94%9F%E7%B1%BB"><span class="nav-number">2.</span> <span class="nav-text">SparkSession伴生类</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#SharedState"><span class="nav-number">2.1.</span> <span class="nav-text">SharedState</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SessionState"><span class="nav-number">2.2.</span> <span class="nav-text">SessionState</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">3.</span> <span class="nav-text">参考</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -404,7 +446,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">20</span>
+          <span class="site-state-item-count">22</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -458,12 +500,12 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">53k</span>
+    <span title="站点总字数">70k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">48 分钟</span>
+    <span title="站点阅读时长">1:04</span>
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
   </div>
@@ -503,6 +545,8 @@
 
   
   <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
   <script src="/lib/velocity/velocity.min.js"></script>
   <script src="/lib/velocity/velocity.ui.min.js"></script>
 

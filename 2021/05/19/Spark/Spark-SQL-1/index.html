@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"www.mobanche.top","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"./public/search.xml"};
+  </script>
+
+  <meta name="description" content="SPARK-27790 Support ANSI SQL INTERVAL Types 本文主要对Spark SQL中添加ANSI SQL INTERVAL 类型的背景、开发过程、代码做了简单的梳理总结，目前分析还不够深入，因为我只是学习了各个PR的代码。相比每个PR的代码来说，PR的评论、Review意见是更值得深入思考的地方，这个还是需要一定的时间消化。 未完待续，持续更新">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Support ANSI SQL INTERVAL TYPES[SPARK-27790]">
+<meta property="og:url" content="http://www.mobanche.top/2021/05/19/Spark/Spark-SQL-1/index.html">
+<meta property="og:site_name" content="末班车">
+<meta property="og:description" content="SPARK-27790 Support ANSI SQL INTERVAL Types 本文主要对Spark SQL中添加ANSI SQL INTERVAL 类型的背景、开发过程、代码做了简单的梳理总结，目前分析还不够深入，因为我只是学习了各个PR的代码。相比每个PR的代码来说，PR的评论、Review意见是更值得深入思考的地方，这个还是需要一定的时间消化。 未完待续，持续更新">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://www.mobanche.top/images/spark/image030.png">
+<meta property="article:published_time" content="2021-05-19T06:34:19.058Z">
+<meta property="article:modified_time" content="2021-05-19T06:46:20.778Z">
+<meta property="article:author" content="Peng Lei">
+<meta property="article:tag" content="spark">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://www.mobanche.top/images/spark/image030.png">
+
+<link rel="canonical" href="http://www.mobanche.top/2021/05/19/Spark/Spark-SQL-1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Support ANSI SQL INTERVAL TYPES[SPARK-27790] | 末班车</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">末班车</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://www.mobanche.top/2021/05/19/Spark/Spark-SQL-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/me.jpg">
+      <meta itemprop="name" content="Peng Lei">
+      <meta itemprop="description" content="壁立千仞.无欲则刚">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="末班车">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Support ANSI SQL INTERVAL TYPES[SPARK-27790]
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-05-19 14:34:19 / 修改时间：14:46:20" itemprop="dateCreated datePublished" datetime="2021-05-19T14:34:19+08:00">2021-05-19</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Spark-SQL%E7%B3%BB%E5%88%97/" itemprop="url" rel="index"><span itemprop="name">Spark SQL系列</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>12k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-27790">SPARK-27790</a> Support ANSI SQL INTERVAL Types</p>
+<p>本文主要对Spark SQL中添加ANSI SQL INTERVAL 类型的背景、开发过程、代码做了简单的梳理总结，目前分析还不够深入，因为我只是学习了各个PR的代码。相比每个PR的代码来说，PR的评论、Review意见是更值得深入思考的地方，这个还是需要一定的时间消化。</p>
+<p>未完待续，持续更新</p>
+<a id="more"></a>
+
+<p>其实Spark SQL中是有INTERVAL的数据类型的，但是其实是不好用的：</p>
+<ul>
+<li>已有的INTERVAL数据类型不支持持久化</li>
+<li>已有的INTERVAL数据类型不能够比较，举个例子“1 Month 1 Day” is equal to “1 Month 1 Day” ？，由于一个月到底是30天呢，还是31天，更或者是28/29天，都不确定，导致了已有的INTERVAL数据类型无法进行比较</li>
+</ul>
+<p>介于上面的背景，Spark社区引入两种符合ANSI SQL 标准的INTERVAL的数据类型来替代现有的INTERVAL数据类型：</p>
+<ul>
+<li>YEAR-MONTH/DAY-SECOND </li>
+<li>两种类型中的字段是可以比较可排序</li>
+<li>两种类型支持日期类型的计算</li>
+<li>可以持久化</li>
+</ul>
+<p>两种风格的INTERVAL数据类型将在一段时间内并存。</p>
+<p>目前<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-27790">SPARK-27790</a>还在开发中，Spark3.2版本Milestone1就会完成.</p>
+<p>相关SubTask汇总如下：</p>
+<ul>
+<li><p>类型定义和外部输入类型：<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-27793">SPARK-27793</a> <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34605">SPARK-34605</a> <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34615">SPARK-34615</a> </p>
+</li>
+<li><p>expressions处理</p>
+<ul>
+<li>Cast：<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34667">SPARK-34667</a> <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34668">SPARK-34668</a></li>
+<li>UnaryMinus/Add/Subtract:  <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34677">SPARK-34677</a></li>
+<li>Sum: <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34716">SPARK-34716</a></li>
+<li>DateAddYMInterval/(AddMonthsBase-&gt;AddMonths): <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34721">SPARK-34721</a></li>
+<li>TimeAdd: <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34761">SPARK-34761</a> <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35051">SPARK-35051</a></li>
+<li>MultiplyYMInterval：<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34824">SPARK-34824</a> </li>
+<li>Average: <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34837">SPARK-34837</a> </li>
+<li>MultiplyDTInterval: <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34850">SPARK-34850</a></li>
+<li>DivideYMInterval/DivideDTInterval : <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34868">SPARK-34868</a>  <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34875">SPARK-34875</a></li>
+<li>SubtractDates ： <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34896">SPARK-34896</a> </li>
+<li>extract/date_part ： <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35091">SPARK-35091</a></li>
+<li>SubtractTimestamps ： <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34903">SPARK-34903</a></li>
+<li>Sequence： <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35088">SPARK-35088</a> </li>
+<li>Hash：<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35113">SPARK-35113</a> </li>
+<li></li>
+</ul>
+</li>
+<li><p>Hive相关：<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35016">SPARK-35016</a> <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35017">SPARK-35017</a> <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35018">SPARK-35018</a> <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35228">SPARK-35228</a> <a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35228">SPARK-35228</a></p>
+</li>
+</ul>
+<p>从这个Task的背景已经相关SubTask的汇总来看，添加ANSI SQL INTERVAL 这条主线能够涵盖Spark SQL的每个知识点，对于想参与Spark社区开发的新人我来说，是一个非常好的学习实践的机会.</p>
+<h2 id="核心SubTask"><a href="#核心SubTask" class="headerlink" title="核心SubTask"></a>核心SubTask</h2><h3 id="SPARK-27793"><a href="#SPARK-27793" class="headerlink" title="SPARK-27793"></a>SPARK-27793</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-27793">SPARK-27793</a> Add ANSI SQL day-time and year-month interval types</p>
+<p>扩展Catalyst的数据类型，引入两个符合ANSI SQL标准的数据类型</p>
+<ul>
+<li><code>DayTimeIntervalType</code> </li>
+<li><code>YearMonthIntervalType</code> </li>
+</ul>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31614">PR分析</a>：</p>
+<ol>
+<li><p>在<code>DataTypes.java</code>文件中增加获取数据类型<code>DayTimeIntervalType/YearMonthIntervalType</code> </p>
+</li>
+<li><p>定义<code>DayTimeIntervalType/YearMonthIntervalType</code> 数据类型</p>
+<ul>
+<li><p><code>DayTimeIntervalType</code>：</p>
+<ol>
+<li><p>内部使用<code>Long</code>来表示这个数据类型</p>
+</li>
+<li><p>计算规则：-/+ (24<em>60</em>60 * DAY + 60*60 * HOUR + 60 * MINUTE + SECOND) * 1000000</p>
+<p>所以数值的单位是<code>microseconds</code></p>
+</li>
+</ol>
+</li>
+<li><p><code>YearMonthIntervalType</code> ：</p>
+<ol>
+<li>内部使用<code>Int</code>来表示这个数据类型</li>
+<li>计算规则： -/+ (12 * YEAR + MONTH)，所以数值的单位是Month</li>
+</ol>
+</li>
+</ul>
+</li>
+</ol>
+<p>重点说明：</p>
+<p><img src="/images/spark/image030.png" alt="image030"></p>
+<p>根据SQL规范，INTERVAL类型的各个字段是不可以为负的，但是本身INTERVAL值可以为负。</p>
+<h3 id="SPARK-34605"><a href="#SPARK-34605" class="headerlink" title="SPARK-34605"></a>SPARK-34605</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34605">SPARK-34605</a> Support java.time.Duration as an external type of the day-time interval type</p>
+<p>该SubTask的目标是能够使并行数据集合中的<code>java.time.Duration</code>可以转成Catalyst的<code>DayTimeIntervalType</code>数据类型，更直观点说，该Task达到以下目的：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">scala&gt; val ds &#x3D; Seq(java.time.Duration.ofDays(10)).toDS</span><br><span class="line">ds: org.apache.spark.sql.Dataset[java.time.Duration] &#x3D; [value: interval day to second]</span><br><span class="line"></span><br><span class="line">###注意：typeName已经由daytimeinterval变成了interval day to sceond</span><br><span class="line"></span><br><span class="line">scala&gt; ds.collect</span><br><span class="line">res0: Array[java.time.Duration] &#x3D; Array(PT240H)</span><br></pre></td></tr></table></figure>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31729">PR分析</a></p>
+<ol>
+<li>添加了<code>DurationConverter</code>方法把<code>java.time.Duration</code>类型转成Catalyst内部DataType（DayTimeIntervalType）<ul>
+<li><code>durationToMicros()</code>, 把<code>Duration</code>转成<code>microseconds</code>.用<code>Long</code>来表示.</li>
+<li><code>microsToDuration()</code>,把<code>microseconds</code>转成<code>Duration</code>.返回<code>Duration</code>类型.</li>
+</ul>
+</li>
+<li>提供了两个方法<code>createDeserializerForDuration</code>和<code>createSerializerForJavaDuration</code>方法，用于<code>Encoder</code> <code>DayTimeIntervalType</code>数据类型</li>
+<li>扩展了<code>Literal</code>，从<code>java.time.Duration</code>类型构造<code>DayTimeIntervalType</code>类型</li>
+</ol>
+<p>附：这个SubTask比较核心，涉及了很多Catalyst的东西，包括数据类型转化，RowEncoder、数据读取、CodeGenerator等</p>
+<h3 id="SPARK-34615"><a href="#SPARK-34615" class="headerlink" title="SPARK-34615"></a>SPARK-34615</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34615">SPARK-34615</a> Support java.time.Period as an external type of the year-month interval type</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31765">PR分析</a></p>
+<p>关于这个SubTask的分析，基本同上SPARK-34605</p>
+<h3 id="SPARK-34667"><a href="#SPARK-34667" class="headerlink" title="SPARK-34667"></a>SPARK-34667</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34667">SPARK-34667</a> Support casting of year-month interval to string</p>
+<p>该SubTask就是增加了把year-month interval 转成string，效果如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">scala&gt; import org.apache.spark.sql.catalyst.expressions.&#123;Literal, Cast&#125;</span><br><span class="line">import org.apache.spark.sql.catalyst.expressions.&#123;Literal, Cast&#125;</span><br><span class="line"></span><br><span class="line">scala&gt; import org.apache.spark.sql.types._</span><br><span class="line">import org.apache.spark.sql.types._</span><br><span class="line"></span><br><span class="line">scala&gt; Cast(Literal(java.time.Period.ofMonths(1)), StringType)</span><br><span class="line">res0: org.apache.spark.sql.catalyst.expressions.Cast &#x3D; cast(INTERVAL &#39;0-1&#39; YEAR TO MONTH as string)</span><br></pre></td></tr></table></figure>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32056">PR分析</a></p>
+<ol>
+<li>扩展<code>Cast expression</code></li>
+<li>在<code>IntervalUtils</code>中增加<code>toYearMonthIntervalString()</code>方法</li>
+</ol>
+<h3 id="SPARK-34668"><a href="#SPARK-34668" class="headerlink" title="SPARK-34668"></a>SPARK-34668</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34668">SPARK-34668</a> Support casting of day-time intervals to strings</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32070">PR分析</a></p>
+<p>同<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34667">SPARK-34667</a></p>
+<h3 id="SPARK-34677"><a href="#SPARK-34677" class="headerlink" title="SPARK-34677"></a>SPARK-34677</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34677">SPARK-34677</a> Support add and subtract of ANSI SQL intervals</p>
+<p>该SubTask的目标是在<code>DayTimeIntervalType</code>和<code>YearMonthIntervalType</code>上支持 <code>+/-</code>运算</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31789">PR分析</a></p>
+<p>TODO</p>
+<h3 id="SPARK-34716"><a href="#SPARK-34716" class="headerlink" title="SPARK-34716"></a>SPARK-34716</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34716">SPARK-34716</a> Support ANSI SQL intervals by the aggregate function sum</p>
+<p>该SubTask的目标是在<code>sum</code>表达式中增加了<code>DayTimeIntervalType</code>和<code>YearMonthIntervalType</code>类型的支持。</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32107">PR分析</a></p>
+<h3 id="SPARK-34721"><a href="#SPARK-34721" class="headerlink" title="SPARK-34721"></a>SPARK-34721</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34721">SPARK-34721</a> Add an year-month interval to a date</p>
+<p>该SubTask的目标是支持 <code>date</code> 加/减 <code>year-month interval</code>, 最终返回<code>date</code>类型</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31812">PR分析</a></p>
+<h3 id="SPARK-34739"><a href="#SPARK-34739" class="headerlink" title="SPARK-34739"></a>SPARK-34739</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34739">SPARK-34739</a> Add an year-month interval to a timestamp</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31861">PR分析</a></p>
+<h3 id="SPARK-34761"><a href="#SPARK-34761" class="headerlink" title="SPARK-34761"></a>SPARK-34761</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34761">SPARK-34761</a> Add a day-time interval to a timestamp</p>
+<p>该SubTask实现了<code>timestamp</code> +/- <code>day-time interval</code>的功能</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31855">PR分析</a></p>
+<h3 id="SPARK-34824"><a href="#SPARK-34824" class="headerlink" title="SPARK-34824"></a>SPARK-34824</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34824">SPARK-34824</a> Multiply year-month interval by numeric</p>
+<p>该SubTask新加了<code>MultiplyYMInterval</code>实现了 <code>numeric * year-month interval</code>的功能</p>
+<p>同时扩展了<code>arithmetic rules</code>支持 <code>numeric * year-month interval</code> 和 <code>year-month interval * numeric</code></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31929">PR分析</a></p>
+<h3 id="SPARK-34837"><a href="#SPARK-34837" class="headerlink" title="SPARK-34837"></a>SPARK-34837</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34837">SPARK-34837</a> Support ANSI SQL intervals by the aggregate function avg</p>
+<p>该SubTask扩展了<code>Average expression</code>来支持<code>DayTimeIntervalType</code>和<code>YearMonthIntervalType</code>数据类型</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32358">PR分析</a></p>
+<h3 id="SPARK-34850"><a href="#SPARK-34850" class="headerlink" title="SPARK-34850"></a>SPARK-34850</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34850">SPARK-34850</a> Multiply day-time interval by numeric</p>
+<p>该SubTask新加了<code>MultiplyDTInterval</code>实现了 <code>numberic * day-time interval</code>的功能</p>
+<p>同时扩展了<code>arithmetic rules</code>支持 <code>numeric * day-time interval</code> 和 <code>day-time interval * numeric</code></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31951">PR分析</a></p>
+<h3 id="SPARK-34868"><a href="#SPARK-34868" class="headerlink" title="SPARK-34868"></a>SPARK-34868</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34868">SPARK-34868</a> Divide year-month interval by numeric</p>
+<p>该SubTask新加了<code>DivideYMInterval</code>实现了 <code>year-month interval / numberic</code></p>
+<p>同时扩展了<code>arithmetic rules</code>支持<code>year-month interval / numberic</code></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31961">PR分析</a></p>
+<h3 id="SPARK-34875"><a href="#SPARK-34875" class="headerlink" title="SPARK-34875"></a>SPARK-34875</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34875">SPARK-34875</a> Divide day-time interval by numeric</p>
+<p>该SubTask新加了<code>DivideDTInterval</code>，实现了<code>day-time interval / numeric</code>的功能</p>
+<p>同时扩展了<code>arithmetic rules</code>支持<code>day-time interval / numeric</code></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31972">PR分析</a></p>
+<h3 id="SPARK-34879"><a href="#SPARK-34879" class="headerlink" title="SPARK-34879"></a>SPARK-34879</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34879">SPARK-34879</a> Hive inspect support DayTimeIntervalType and YearMonthIntervalType</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31979">PR分析</a></p>
+<h3 id="SPARK-34896"><a href="#SPARK-34896" class="headerlink" title="SPARK-34896"></a>SPARK-34896</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34896">SPARK-34896</a> Return day-time interval from dates subtraction</p>
+<p>该SubTask修改了<code>SubtractDates expression</code>，同时增加了<code>spark.sql.legacy.interval.enabled</code>参数，在参数设置为false(默认)的情况下，<code>SubtractDates</code>返回的结果类型为<code>DayTimeIntervalType</code></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31996">PR分析</a></p>
+<h3 id="SPARK-35091"><a href="#SPARK-35091" class="headerlink" title="SPARK-35091"></a>SPARK-35091</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35091">SPARK-35091</a> Support ANSI intervals by date_part()</p>
+<p>该SubTask扩展了<code>extract/date_part expression</code>，使得支持<code>ANSI Intervals</code></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32351">PR分析</a></p>
+<h3 id="SPARK-34903"><a href="#SPARK-34903" class="headerlink" title="SPARK-34903"></a>SPARK-34903</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34903">SPARK-34903</a> Return day-time interval from timestamps subtraction</p>
+<p>该SubTask修改了<code>SubtractTimestamps expression</code>，使它返回的结果数据类型为<code>DayTimeIntervalType</code></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32016">PR分析</a></p>
+<h3 id="SPARK-35129"><a href="#SPARK-35129" class="headerlink" title="SPARK-35129"></a>SPARK-35129</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35129">SPARK-35129</a> Construct year-month interval column from integral fields</p>
+<p>OPEN</p>
+<h3 id="SPARK-35111"><a href="#SPARK-35111" class="headerlink" title="SPARK-35111"></a>SPARK-35111</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35111">SPARK-35111</a> Cast string to year-month interval</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32444">PR分析</a></p>
+<h3 id="SPARK-35037"><a href="#SPARK-35037" class="headerlink" title="SPARK-35037"></a>SPARK-35037</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35037">SPARK-35037</a> Recognize sign before the interval string in literals</p>
+<p>扩展了SQL syntax rules，是它支持<code>year-month/day-time intervals</code> 前面带有负号.</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32134">PR分析</a></p>
+<p>在<code>visitUnitToUnitInterval</code>方法中增加负数的处理</p>
+<h3 id="SPARK-35051"><a href="#SPARK-35051" class="headerlink" title="SPARK-35051"></a>SPARK-35051</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35051">SPARK-35051</a> Add a day-time interval to a date</p>
+<p>该Subtask实现了 <code>date +/- day-time interval</code>的功能</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32170">PR分析</a></p>
+<ul>
+<li>先把<code>date</code>转成<code>timestamp</code></li>
+<li>然后<code>timestamp +/- day-time interval</code></li>
+</ul>
+<h3 id="SPARK-35076"><a href="#SPARK-35076" class="headerlink" title="SPARK-35076"></a>SPARK-35076</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35076">SPARK-35076</a> Parse interval literals as ANSI intervals</p>
+<p>IN PROCESSING</p>
+<h3 id="SPARK-35088"><a href="#SPARK-35088" class="headerlink" title="SPARK-35088"></a>SPARK-35088</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35088">SPARK-35088</a> Accept ANSI intervals by the Sequence expression</p>
+<p><code>Sequence expression</code>支持<code>year-month/day-time interval</code> 类型</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32492">PR分析</a></p>
+<h3 id="SPARK-35090"><a href="#SPARK-35090" class="headerlink" title="SPARK-35090"></a>SPARK-35090</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35090">SPARK-35090</a> Extract a field from ANSI interval</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32351">PR分析</a></p>
+<p>IN PROGRESS</p>
+<h3 id="SPARK-35099"><a href="#SPARK-35099" class="headerlink" title="SPARK-35099"></a>SPARK-35099</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35099">SPARK-35099</a> Convert ANSI interval literals to SQL string</p>
+<p>在<code>Literal</code>中的<code>sql()</code>和<code>toString()</code>方法中增加了<code>YearMonthIntervalType</code>和<code>DayTimeIntervalType</code>的处理</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32196">PR分析</a></p>
+<h3 id="SPARK-35107"><a href="#SPARK-35107" class="headerlink" title="SPARK-35107"></a>SPARK-35107</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35107">SPARK-35017</a> Parse unit-to-unit interval literals to ANSI intervals</p>
+<p>解析<code>unit-to-unit interval</code>成<code>YearMonthIntervalType</code>或者<code>DayTimeIntervalType</code></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32209">PR分析</a></p>
+<h3 id="SPARK-35110"><a href="#SPARK-35110" class="headerlink" title="SPARK-35110"></a>SPARK-35110</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35110">SPARK-35110</a> Handle ANSI intervals in WindowExecBase</p>
+<p>该SubTask的目标是<code>WindowExecBase</code>支持<code>YearMonthIntervalType</code>和<code>DayTimeIntervalType</code>数据类型</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32294">PR分析</a></p>
+<h3 id="SPARK-35113"><a href="#SPARK-35113" class="headerlink" title="SPARK-35113"></a>SPARK-35113</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35113">SPARK-35113</a> Support ANSI intervals in the Hash expression</p>
+<p>该SubTask在<code>Hash</code>表达式中增加了<code>YearMonthIntervalType</code>和<code>DayTimeIntervalType</code>的支持</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32259">PR分析</a></p>
+<h3 id="SPARK-35139"><a href="#SPARK-35139" class="headerlink" title="SPARK-35139"></a>SPARK-35139</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35139">SPARK-35139</a> Support ANSI intervals as Arrow Column vectors</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32340">PR分析</a></p>
+<h3 id="SPARK-35153"><a href="#SPARK-35153" class="headerlink" title="SPARK-35153"></a>SPARK-35153</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35153">SPARK-35153</a> Override sql() of ANSI interval operators</p>
+<p>重写了<code>sql()</code>方法，使运算表达式更加可读，</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32262">PR分析</a></p>
+<ol>
+<li><code>MultiplyYMInterval</code>中重写<code>sql()</code>方法</li>
+<li><code>MultiplyDTInterval</code>中重写<code>sql()</code>方法</li>
+<li><code>DivideYMInterval</code>中重写<code>sql()</code>方法</li>
+<li><code>DivideDTInterval</code>中重写<code>sql()</code>方法</li>
+<li><code>SubstractTimestamps</code>中重写<code>sql()</code>方法</li>
+</ol>
+<h3 id="SPARK-35243"><a href="#SPARK-35243" class="headerlink" title="SPARK-35243"></a>SPARK-35243</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35243">SPARK-35243</a> Support columnar execution on ANSI interval types</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32452">PR分析</a></p>
+<h3 id="SPARK-35285"><a href="#SPARK-35285" class="headerlink" title="SPARK-35285"></a>SPARK-35285</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35285">SPARK-35285</a> Parse ANSI interval types in SQL</p>
+<p>该SubTask的目的是增加SQL Parser功能，使得SQL Parser可以解析：</p>
+<ul>
+<li><code>INTERVAL YEAR TO MONTH</code> to <code>YearMonthIntervalType</code></li>
+<li><code>INTERVAL DAY TO SECOND</code> to <code>DayTimeIntervalType</code></li>
+</ul>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32409">PR分析</a></p>
+<ol>
+<li>在<code>SqlBase.g4</code>中增加 <code>INTERVAL YEAR TO MONTH / INTERVAL DAY TO SECOND</code>的解析规则</li>
+<li>在<code>AstBuilder.scala</code>中增加<code>YearMonthIntervalDataType/DayTimeIntervalType</code>的访问</li>
+</ol>
+<p>Spark提供了一个SqlBase.g4文件，编译的时候，会使用Antlr根据这个文件生成对应的词法解析和语法分析类，同时还使用了访问者模式，用于构建Logical Plan（语法树）。</p>
+<p>访问者模式简单说就是会去遍历生成的语法树（针对语法树中每个节点生成visit方法），以及返回相应的值。</p>
+<p>Spark通过AstBuilder继承SqlBaseBaseVisitor类，重写了对应节点的visit方法，实现了自己的访问逻辑。</p>
+<h2 id="其他SubTask"><a href="#其他SubTask" class="headerlink" title="其他SubTask"></a>其他SubTask</h2><h3 id="SPARK-34619"><a href="#SPARK-34619" class="headerlink" title="SPARK-34619"></a>SPARK-34619</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34619">SPARK-34619</a> Update the Spark SQL guide about day-time and year-month interval types</p>
+<p>目前处于open状态</p>
+<h3 id="SPARK-34663"><a href="#SPARK-34663" class="headerlink" title="SPARK-34663"></a>SPARK-34663</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34663">SPARK-34663</a> Test year-month and day-time intervals in UDF</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31779">PR分析</a></p>
+<p>其实这个也可以算是<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34605">SPARK-34605</a>和<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34615">SPARK-34615</a>的补充测试，在UDF中可以使用<code>Duration</code>和<code>Period</code>类型进行计算.</p>
+<h3 id="SPARK-34666"><a href="#SPARK-34666" class="headerlink" title="SPARK-34666"></a>SPARK-34666</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34666">SPARK-34666</a> Test DayTimeIntervalType/YearMonthIntervalType as ordered and atomic types</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31782">PR分析</a></p>
+<p>首先在SPARK中<code>DataType</code>上的测试类型包括以下：</p>
+<ol>
+<li>ArithmeticExpressionSuite:<ul>
+<li>“function least”</li>
+<li>“function greatest”</li>
+</ul>
+</li>
+<li>PredicateSuite<ul>
+<li>“BinaryComparison consistency check”</li>
+<li>“AND, OR, EqualTo, EqualNullSafe consistency check”</li>
+</ul>
+</li>
+<li>ConditionalExpressionSuite<ul>
+<li>“if”</li>
+</ul>
+</li>
+<li>RandomDataGeneratorSuite<ul>
+<li>“Basic types”</li>
+</ul>
+</li>
+<li>CastSuite<ul>
+<li>“null cast”</li>
+<li>“up-cast”</li>
+<li>“<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-27671">SPARK-27671</a>: cast from nested null type in struct”</li>
+</ul>
+</li>
+<li>OrderingSuite<ul>
+<li>“GenerateOrdering with DayTimeIntervalType”</li>
+<li>“GenerateOrdering with YearMonthIntervalType”</li>
+</ul>
+</li>
+<li>PredicateSuite<ul>
+<li>“IN with different types”</li>
+</ul>
+</li>
+<li>UnsafeRowSuite<ul>
+<li>“calling get(ordinal, datatype) on null columns”</li>
+</ul>
+</li>
+<li>SortSuite<ul>
+<li>“sorting on YearMonthIntervalType …”</li>
+<li>“sorting on DayTimeIntervalType …”</li>
+</ul>
+</li>
+</ol>
+<p>为了能够使<code>DayTimeIntervalType/YearMonthIntervalType</code>可以用于以上场景的测试</p>
+<ol>
+<li>在<code>DataTypeTestUtils.ordered</code>/<code>atomicTypes</code> 中增加<code>DayTimeIntervalType</code> 和<code>YearMonthIntervalType</code> </li>
+<li>在<code>LiteralGenerator</code>/<code>RandomDataGenerator</code>中增加了case，来生成<code>DayTimeIntervalType</code> 和<code>YearMonthIntervalType</code> 类型的数据</li>
+</ol>
+<h3 id="SPARK-34695"><a href="#SPARK-34695" class="headerlink" title="SPARK-34695"></a>SPARK-34695</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34695">SPARK-34695</a> Overflow in round trip conversion from micros to duration</p>
+<p>该SubTask的目标是解决micros和duration之间的转化产生溢出的问题</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31799">PR分析</a></p>
+<h3 id="SPARK-34715"><a href="#SPARK-34715" class="headerlink" title="SPARK-34715"></a>SPARK-34715</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34715">SPARK-34715</a> Add round trip tests for period &lt;-&gt; month and duration &lt;-&gt; micros</p>
+<p>该SubTask的目标是增加了测试</p>
+<ol>
+<li>period &lt;-&gt; month &lt;-&gt; period</li>
+<li>duration &lt;-&gt; micros  &lt;-&gt; duration </li>
+</ol>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32234">PR分析</a></p>
+<h3 id="SPARK-34718"><a href="#SPARK-34718" class="headerlink" title="SPARK-34718"></a>SPARK-34718</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34718">SPARK-34718</a> Assign pretty names to YearMonthIntervalType and DayTimeIntervalType</p>
+<p>该SubTask的目标是修改 <code>YearMonthIntervalType</code> 和 <code>DayTimeIntervalType</code> 的type name</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31810/">PR分析</a></p>
+<h3 id="SPARK-34793"><a href="#SPARK-34793" class="headerlink" title="SPARK-34793"></a>SPARK-34793</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34793">SPARK-34793</a> Prohibit saving of day-time and year-month intervals</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31884">PR分析</a></p>
+<h3 id="SPARK-34841"><a href="#SPARK-34841" class="headerlink" title="SPARK-34841"></a>SPARK-34841</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34841">SPARK-34841</a> Push ANSI interval binary expressions into into (if / case) branches</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/31978">PR分析</a></p>
+<h3 id="SPARK-34878"><a href="#SPARK-34878" class="headerlink" title="SPARK-34878"></a>SPARK-34878</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34878">SPARK-34878</a> Test actual size of year-month and day-time intervals</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32366">PR分析</a></p>
+<h3 id="SPARK-34905"><a href="#SPARK-34905" class="headerlink" title="SPARK-34905"></a>SPARK-34905</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34905">SPARK-34905</a> Enable ANSI intervals in SQLQueryTestSuite</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32099">PR分析</a></p>
+<h3 id="SPARK-35018"><a href="#SPARK-35018" class="headerlink" title="SPARK-35018"></a>SPARK-35018</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35018">SPARK-35018</a> Test transferring year-month interval via Hive Thrift server</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32240">PR分析</a></p>
+<h3 id="SPARK-35085"><a href="#SPARK-35085" class="headerlink" title="SPARK-35085"></a>SPARK-35085</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35085">SPARK-35085</a> Get columns operation should handle ANSI interval column properly</p>
+<p>支持JDBC的客户端能够正确识别ANSI interval类型的列</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32345">PR分析</a></p>
+<h3 id="SPARK-35177"><a href="#SPARK-35177" class="headerlink" title="SPARK-35177"></a>SPARK-35177</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35177">SPARK-35177</a> IntervalUtils.fromYearMonthString can’t handle Int.MinValue correctly</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32281">PR分析</a></p>
+<h3 id="SPARK-35095"><a href="#SPARK-35095" class="headerlink" title="SPARK-35095"></a>SPARK-35095</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35095">SPARK-35095</a> Use ANSI intervals in streaming join tests</p>
+<h3 id="SPARK-35114"><a href="#SPARK-35114" class="headerlink" title="SPARK-35114"></a>SPARK-35114</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35114">SPARK-35114</a> Test ANSI interval literals</p>
+<p>在LiteralExpressionSuite中增加了对YearMonthIntervalType和DayTimeIntervalType的测试</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32213">PR分析</a></p>
+<h3 id="SPARK-35115"><a href="#SPARK-35115" class="headerlink" title="SPARK-35115"></a>SPARK-35115</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35115">SPARK-35115</a> Test ANSI intervals in MutableProjectionSuite</p>
+<p>在MutableProjectionSuite测试中增加了对YearMonthIntervalType和DayTimeIntervalType的测试</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32225">PR分析</a></p>
+<h3 id="SPARK-35116"><a href="#SPARK-35116" class="headerlink" title="SPARK-35116"></a>SPARK-35116</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35116">SPARK-35116</a> The generated data fits the precision of DayTimeIntervalType in spark</p>
+<p>该SubTask修改了RandomDataGenerator中生成DayTimeIntervalType类型数据的精度，在Spark中DayTimeIntervalType的精度使微妙，在java.time.Duration中精度使纳秒</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32212">PR分析</a></p>
+<h3 id="SPARK-35068"><a href="#SPARK-35068" class="headerlink" title="SPARK-35068"></a>SPARK-35068</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35068">SPARK-35068</a> Add tests for ANSI intervals to HiveThriftBinaryServerSuite</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32250">PR分析</a></p>
+<h3 id="SPARK-35130"><a href="#SPARK-35130" class="headerlink" title="SPARK-35130"></a>SPARK-35130</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35130">SPARK-35130</a> Construct day-time interval column from integral fields</p>
+<h3 id="SPARK-35169"><a href="#SPARK-35169" class="headerlink" title="SPARK-35169"></a>SPARK-35169</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35169">SPARK-35169</a> Wrong result of min ANSI interval division by -1</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32314">PR分析</a></p>
+<h3 id="SPARK-35187"><a href="#SPARK-35187" class="headerlink" title="SPARK-35187"></a>SPARK-35187</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35187">SPARK-35187</a> Failure on minimal interval literal</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">spark-sql&gt; SELECT INTERVAL &#39;-178956970-8&#39; YEAR TO MONTH;</span><br><span class="line">-178956970-8</span><br><span class="line"></span><br><span class="line">spark-sql&gt; SELECT INTERVAL -&#39;178956970-8&#39; YEAR TO MONTH;</span><br><span class="line">Error in query:</span><br><span class="line">Error parsing interval year-month string: integer overflow(line 1, pos 16)</span><br></pre></td></tr></table></figure>
+<p>处理符号位在Interval string外边的时候，产生异常的场景</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32296">PR分析</a></p>
+<ol>
+<li>AstBuilder.scala中处理了读取数据的逻辑</li>
+<li>在interval.sql中增加了测试case</li>
+</ol>
+<h3 id="SPARK-35228"><a href="#SPARK-35228" class="headerlink" title="SPARK-35228"></a>SPARK-35228</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35228">SPARK-35228</a> Add expression ToHiveString for keep consistent between hive/spark format in df.show and transform</p>
+<p>IN PROGRESS</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32365">PR分析</a></p>
+<h3 id="SPARK-35112"><a href="#SPARK-35112" class="headerlink" title="SPARK-35112"></a>SPARK-35112</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35112">SPARK-35112</a> Cast string to day-time interval</p>
+<p>该SubTask是<a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35111">SPARK-35111</a> 的补充</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32444">PR分析</a></p>
+<h3 id="SPARK-34984"><a href="#SPARK-34984" class="headerlink" title="SPARK-34984"></a>SPARK-34984</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-34984">SPARK-34984</a> ANSI intervals formatting in hive results</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32087">PR分析</a></p>
+<h3 id="SPARK-35016"><a href="#SPARK-35016" class="headerlink" title="SPARK-35016"></a>SPARK-35016</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35016">SPARK-35016</a> Format ANSI intervals in Hive style</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32120">PR分析</a></p>
+<h3 id="SPARK-35017"><a href="#SPARK-35017" class="headerlink" title="SPARK-35017"></a>SPARK-35017</h3><p><a target="_blank" rel="noopener" href="https://issues.apache.org/jira/browse/SPARK-35017">SPARK-35017</a> Transfer ANSI intervals via Hive Thrift server</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/32121">PR分析</a></p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>TODO</p>
+<h2 id="附录"><a href="#附录" class="headerlink" title="附录"></a>附录</h2><p>SQL standard for INTERVAL</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">&lt;interval literal&gt; ::&#x3D;</span><br><span class="line">  INTERVAL [ &lt;sign&gt; ] &lt;interval string&gt; &lt;interval qualifier&gt;</span><br><span class="line"></span><br><span class="line">&lt;interval qualifier&gt; ::&#x3D;</span><br><span class="line">    &lt;start field&gt; TO &lt;end field&gt;</span><br><span class="line">  | &lt;single datetime field&gt;</span><br><span class="line">&lt;start field&gt; ::&#x3D;</span><br><span class="line">&lt;non-second primary datetime field&gt;</span><br><span class="line">      [ &lt;left paren&gt; &lt;interval leading field precision&gt; &lt;right paren&gt; ]</span><br><span class="line">&lt;end field&gt; ::&#x3D;</span><br><span class="line">&lt;non-second primary datetime field&gt;</span><br><span class="line">  | SECOND [ &lt;left paren&gt; &lt;interval fractional seconds precision&gt; &lt;right paren&gt; ]</span><br><span class="line">&lt;single datetime field&gt; ::&#x3D; &lt;non-second primary datetime field&gt;</span><br><span class="line">        [ &lt;left paren&gt; &lt;interval leading field precision&gt; &lt;right paren&gt; ]</span><br><span class="line">  | SECOND [ &lt;left paren&gt; &lt;interval leading field precision&gt;</span><br><span class="line">      [ &lt;comma&gt; &lt;interval fractional seconds precision&gt; ] &lt;right paren&gt; ]</span><br><span class="line">&lt;primary datetime field&gt; ::&#x3D; &lt;non-second primary datetime field&gt;</span><br><span class="line">| SECOND</span><br><span class="line">&lt;non-second primary datetime field&gt; ::&#x3D; YEAR</span><br><span class="line">  | MONTH</span><br><span class="line">  | DAY</span><br><span class="line">  | HOUR</span><br><span class="line">  | MINUTE</span><br><span class="line"></span><br><span class="line">&lt;interval string&gt; ::&#x3D;</span><br><span class="line">  &lt;quote&gt; &lt;unquoted interval string&gt; &lt;quote&gt;</span><br><span class="line">&lt;unquoted interval string&gt; ::&#x3D;</span><br><span class="line">[ &lt;sign&gt; ] &#123; &lt;year-month literal&gt; | &lt;day-time literal&gt; &#125;</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a target="_blank" rel="noopener" href="https://github.com/apache/spark">Spark代码</a></p>
+
+    </div>
+
+    
+    
+    
+        <div class="reward-container">
+  <div>您的支持将鼓励我继续创作.</div>
+  <button onclick="var qr = document.getElementById('qr'); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
+    打赏
+  </button>
+  <div id="qr" style="display: none;">
+      
+      <div style="display: inline-block;">
+        <img src="/images/pay/01.jpg" alt="Peng Lei 微信支付">
+        <p>微信支付</p>
+      </div>
+      
+      <div style="display: inline-block;">
+        <img src="/images/pay/02.jpg" alt="Peng Lei 支付宝">
+        <p>支付宝</p>
+      </div>
+
+  </div>
+</div>
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/spark/" rel="tag"># spark</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/26/Spark/Spark%E5%9F%BA%E7%A1%80-10/" rel="prev" title="Spark SchedulerBackend">
+      <i class="fa fa-chevron-left"></i> Spark SchedulerBackend
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83SubTask"><span class="nav-number">1.</span> <span class="nav-text">核心SubTask</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-27793"><span class="nav-number">1.1.</span> <span class="nav-text">SPARK-27793</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34605"><span class="nav-number">1.2.</span> <span class="nav-text">SPARK-34605</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34615"><span class="nav-number">1.3.</span> <span class="nav-text">SPARK-34615</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34667"><span class="nav-number">1.4.</span> <span class="nav-text">SPARK-34667</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34668"><span class="nav-number">1.5.</span> <span class="nav-text">SPARK-34668</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34677"><span class="nav-number">1.6.</span> <span class="nav-text">SPARK-34677</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34716"><span class="nav-number">1.7.</span> <span class="nav-text">SPARK-34716</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34721"><span class="nav-number">1.8.</span> <span class="nav-text">SPARK-34721</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34739"><span class="nav-number">1.9.</span> <span class="nav-text">SPARK-34739</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34761"><span class="nav-number">1.10.</span> <span class="nav-text">SPARK-34761</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34824"><span class="nav-number">1.11.</span> <span class="nav-text">SPARK-34824</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34837"><span class="nav-number">1.12.</span> <span class="nav-text">SPARK-34837</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34850"><span class="nav-number">1.13.</span> <span class="nav-text">SPARK-34850</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34868"><span class="nav-number">1.14.</span> <span class="nav-text">SPARK-34868</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34875"><span class="nav-number">1.15.</span> <span class="nav-text">SPARK-34875</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34879"><span class="nav-number">1.16.</span> <span class="nav-text">SPARK-34879</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34896"><span class="nav-number">1.17.</span> <span class="nav-text">SPARK-34896</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35091"><span class="nav-number">1.18.</span> <span class="nav-text">SPARK-35091</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34903"><span class="nav-number">1.19.</span> <span class="nav-text">SPARK-34903</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35129"><span class="nav-number">1.20.</span> <span class="nav-text">SPARK-35129</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35111"><span class="nav-number">1.21.</span> <span class="nav-text">SPARK-35111</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35037"><span class="nav-number">1.22.</span> <span class="nav-text">SPARK-35037</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35051"><span class="nav-number">1.23.</span> <span class="nav-text">SPARK-35051</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35076"><span class="nav-number">1.24.</span> <span class="nav-text">SPARK-35076</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35088"><span class="nav-number">1.25.</span> <span class="nav-text">SPARK-35088</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35090"><span class="nav-number">1.26.</span> <span class="nav-text">SPARK-35090</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35099"><span class="nav-number">1.27.</span> <span class="nav-text">SPARK-35099</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35107"><span class="nav-number">1.28.</span> <span class="nav-text">SPARK-35107</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35110"><span class="nav-number">1.29.</span> <span class="nav-text">SPARK-35110</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35113"><span class="nav-number">1.30.</span> <span class="nav-text">SPARK-35113</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35139"><span class="nav-number">1.31.</span> <span class="nav-text">SPARK-35139</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35153"><span class="nav-number">1.32.</span> <span class="nav-text">SPARK-35153</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35243"><span class="nav-number">1.33.</span> <span class="nav-text">SPARK-35243</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35285"><span class="nav-number">1.34.</span> <span class="nav-text">SPARK-35285</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E4%BB%96SubTask"><span class="nav-number">2.</span> <span class="nav-text">其他SubTask</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34619"><span class="nav-number">2.1.</span> <span class="nav-text">SPARK-34619</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34663"><span class="nav-number">2.2.</span> <span class="nav-text">SPARK-34663</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34666"><span class="nav-number">2.3.</span> <span class="nav-text">SPARK-34666</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34695"><span class="nav-number">2.4.</span> <span class="nav-text">SPARK-34695</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34715"><span class="nav-number">2.5.</span> <span class="nav-text">SPARK-34715</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34718"><span class="nav-number">2.6.</span> <span class="nav-text">SPARK-34718</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34793"><span class="nav-number">2.7.</span> <span class="nav-text">SPARK-34793</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34841"><span class="nav-number">2.8.</span> <span class="nav-text">SPARK-34841</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34878"><span class="nav-number">2.9.</span> <span class="nav-text">SPARK-34878</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34905"><span class="nav-number">2.10.</span> <span class="nav-text">SPARK-34905</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35018"><span class="nav-number">2.11.</span> <span class="nav-text">SPARK-35018</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35085"><span class="nav-number">2.12.</span> <span class="nav-text">SPARK-35085</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35177"><span class="nav-number">2.13.</span> <span class="nav-text">SPARK-35177</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35095"><span class="nav-number">2.14.</span> <span class="nav-text">SPARK-35095</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35114"><span class="nav-number">2.15.</span> <span class="nav-text">SPARK-35114</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35115"><span class="nav-number">2.16.</span> <span class="nav-text">SPARK-35115</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35116"><span class="nav-number">2.17.</span> <span class="nav-text">SPARK-35116</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35068"><span class="nav-number">2.18.</span> <span class="nav-text">SPARK-35068</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35130"><span class="nav-number">2.19.</span> <span class="nav-text">SPARK-35130</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35169"><span class="nav-number">2.20.</span> <span class="nav-text">SPARK-35169</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35187"><span class="nav-number">2.21.</span> <span class="nav-text">SPARK-35187</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35228"><span class="nav-number">2.22.</span> <span class="nav-text">SPARK-35228</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35112"><span class="nav-number">2.23.</span> <span class="nav-text">SPARK-35112</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-34984"><span class="nav-number">2.24.</span> <span class="nav-text">SPARK-34984</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35016"><span class="nav-number">2.25.</span> <span class="nav-text">SPARK-35016</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SPARK-35017"><span class="nav-number">2.26.</span> <span class="nav-text">SPARK-35017</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">3.</span> <span class="nav-text">小结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%E5%BD%95"><span class="nav-number">4.</span> <span class="nav-text">附录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">5.</span> <span class="nav-text">参考</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Peng Lei"
+      src="/images/me.jpg">
+  <p class="site-author-name" itemprop="name">Peng Lei</p>
+  <div class="site-description" itemprop="description">壁立千仞.无欲则刚</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">22</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="mailto:peng.8lei@gmail.com" title="E-Mail → mailto:peng.8lei@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Peng Lei</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">70k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">1:04</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+  <script>
+    (function(){
+      var canonicalURL, curProtocol;
+      //Get the <link> tag
+      var x=document.getElementsByTagName("link");
+		//Find the last canonical URL
+		if(x.length > 0){
+			for (i=0;i<x.length;i++){
+				if(x[i].rel.toLowerCase() == 'canonical' && x[i].href){
+					canonicalURL=x[i].href;
+				}
+			}
+		}
+    //Get protocol
+	    if (!canonicalURL){
+	    	curProtocol = window.location.protocol.split(':')[0];
+	    }
+	    else{
+	    	curProtocol = canonicalURL.split(':')[0];
+	    }
+      //Get current URL if the canonical URL does not exist
+	    if (!canonicalURL) canonicalURL = window.location.href;
+	    //Assign script content. Replace current URL with the canonical URL
+      !function(){var e=/([http|https]:\/\/[a-zA-Z0-9\_\.]+\.baidu\.com)/gi,r=canonicalURL,t=document.referrer;if(!e.test(r)){var n=(String(curProtocol).toLowerCase() === 'https')?"https://sp0.baidu.com/9_Q4simg2RQJ8t7jm9iCKT-xh_/s.gif":"//api.share.baidu.com/s.gif";t?(n+="?r="+encodeURIComponent(document.referrer),r&&(n+="&l="+r)):r&&(n+="?l="+r);var i=new Image;i.src=n}}(window);})();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '566a3c91fad003b56198',
+      clientSecret: '347cd7479fcc953935f228ecdf3c6af447e51793',
+      repo        : 'Comments',
+      owner       : 'Peng-Lei',
+      admin       : ['Peng-Lei'],
+      id          : 'b85d1cd0403217a5502a0418e65cd54f',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+</body>
+</html>

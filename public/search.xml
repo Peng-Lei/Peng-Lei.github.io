@@ -111,6 +111,58 @@
       </tags>
   </entry>
   <entry>
+    <title>Spark on K8S Feature分析</title>
+    <url>/2021/03/23/Spark/Spark-On-K8S-3/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在Spark App的执行过程中，有两种进程：Driver和Executor，这两种进程都会运行在K8S的Pod中，那么Driver和Executor运行的Pod环境是什么样的呢？又是如何定义呢？这就是feature包的作用了。</p>
+<a id="more"></a>
+
+<p>这篇博客所分析的代码路径</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">~&#x2F;Bigdata&#x2F;spark&#x2F;resource-managers&#x2F;kubernetes&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;org&#x2F;apache&#x2F;spark&#x2F;deploy&#x2F;k8s&#x2F;features</span><br></pre></td></tr></table></figure>
+<h2 id="Driver和Executor的创建"><a href="#Driver和Executor的创建" class="headerlink" title="Driver和Executor的创建"></a>Driver和Executor的创建</h2><h3 id="Driver的创建"><a href="#Driver的创建" class="headerlink" title="Driver的创建"></a>Driver的创建</h3><ol>
+<li><p>KubernetesClientApplication的入口方法start，调用自己的run 方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class KubernetesClientApplication extends SparkApplication &#123;</span><br><span class="line"></span><br><span class="line">  override def start(args: Array[String], conf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    val parsedArguments &#x3D; ClientArguments.fromCommandLineArgs(args)</span><br><span class="line">    run(parsedArguments, conf)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  private def run(clientArguments: ClientArguments, sparkConf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">   Utils.tryWithResource(SparkKubernetesClientFactory.createKubernetesClient(</span><br><span class="line">      master,</span><br><span class="line">      Some(kubernetesConf.namespace),</span><br><span class="line">      KUBERNETES_AUTH_SUBMISSION_CONF_PREFIX,</span><br><span class="line">      SparkKubernetesClientFactory.ClientType.Submission,</span><br><span class="line">      sparkConf,</span><br><span class="line">      None,</span><br><span class="line">      None)) &#123; kubernetesClient &#x3D;&gt;</span><br><span class="line">        &#x2F;&#x2F;创建client并运行</span><br><span class="line">        val client &#x3D; new Client(</span><br><span class="line">          kubernetesConf,</span><br><span class="line">          new KubernetesDriverBuilder(),</span><br><span class="line">          kubernetesClient,</span><br><span class="line">          watcher)</span><br><span class="line">        client.run()</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>Client的run方法创建Driver</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class Client(</span><br><span class="line">    conf: KubernetesDriverConf,</span><br><span class="line">    builder: KubernetesDriverBuilder,</span><br><span class="line">    kubernetesClient: KubernetesClient,</span><br><span class="line">    watcher: LoggingPodStatusWatcher) extends Logging &#123;</span><br><span class="line"></span><br><span class="line">  def run(): Unit &#x3D; &#123;</span><br><span class="line">    &#x2F;&#x2F;重点-&gt; 构建Pod的Spec即buildFromFeatures</span><br><span class="line">    val resolvedDriverSpec &#x3D; builder.buildFromFeatures(conf, kubernetesClient)</span><br><span class="line">    ...</span><br><span class="line">    val resolvedDriverPod &#x3D; new PodBuilder(resolvedDriverSpec.pod.pod)</span><br><span class="line">      .editSpec()</span><br><span class="line">        .addToContainers(resolvedDriverContainer)</span><br><span class="line">        .addNewVolume()</span><br><span class="line">          .withName(SPARK_CONF_VOLUME_DRIVER)</span><br><span class="line">          .withNewConfigMap()</span><br><span class="line">            .withItems(KubernetesClientUtils.buildKeyToPathObjects(confFilesMap).asJava)</span><br><span class="line">            .withName(configMapName)</span><br><span class="line">            .endConfigMap()</span><br><span class="line">          .endVolume()</span><br><span class="line">        .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;调用kubernetesClient去创建Pod</span><br><span class="line">    val createdDriverPod &#x3D; kubernetesClient.pods().create(resolvedDriverPod)</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+</li>
+</ol>
+<p>所以呢？<code>Driver</code>的创建依赖于<code>KubernetesDriverBuilder</code>的<code>buildFromFeatures</code>方法</p>
+<h3 id="Executor的创建"><a href="#Executor的创建" class="headerlink" title="Executor的创建"></a>Executor的创建</h3><ol>
+<li><p>ExecutorPodsAllocator的start方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def start(applicationId: String): Unit &#x3D; &#123;</span><br><span class="line">  snapshotsStore.addSubscriber(podAllocationDelay) &#123;</span><br><span class="line">    onNewSnapshots(applicationId, _)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>ExecutorPodsAllocator的onNewSnapshots方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def onNewSnapshots(</span><br><span class="line">    applicationId: String,</span><br><span class="line">    snapshots: Seq[ExecutorPodsSnapshot]): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    if (newlyCreatedExecutorsForRpId.isEmpty</span><br><span class="line">      &amp;&amp; knownPodCount &lt; targetNum) &#123;</span><br><span class="line">      requestNewExecutors(targetNum, knownPodCount, applicationId, rpId)</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+<li><p>ExecutorPodsAllocator的requestNewExecutors方法</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def requestNewExecutors(</span><br><span class="line">    expected: Int,</span><br><span class="line">    running: Int,</span><br><span class="line">    applicationId: String,</span><br><span class="line">    resourceProfileId: Int): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    val resolvedExecutorSpec &#x3D; executorBuilder.buildFromFeatures(executorConf, secMgr,</span><br><span class="line">      kubernetesClient, rpIdToResourceProfile(resourceProfileId))      </span><br><span class="line">    ...</span><br><span class="line">    val podWithAttachedContainer &#x3D; new PodBuilder(executorPod.pod)</span><br><span class="line">      .editOrNewSpec()</span><br><span class="line">      .addToContainers(executorPod.container)</span><br><span class="line">      .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    val createdExecutorPod &#x3D; kubernetesClient.pods().create(podWithAttachedContainer)</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">   </span><br></pre></td></tr></table></figure>
+<p>所以呢？<code>Executor</code>的创建依赖于<code>KubernetesExecutorBuilder</code>的<code>buildFromFeatures</code>方法</p>
+</li>
+</ol>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>不管是Driver还是Executor都是通过kubernetesClient客户端调用create的方法创建，只是传入的PodBuilder参数不同，创建时机不同。在构建PodBuilder的过程中，使用了feature包的各种配置进行组装。</p>
+<p><img src="/images/spark/image010.png"></p>
+<h2 id="feature"><a href="#feature" class="headerlink" title="feature"></a>feature</h2><p><img src="/images/spark/image011.png"></p>
+<p>先看一下<code>KubernetesFeatureConfigStep</code>，这个是基础接口，后面的实现类其实非常简单，从类名上基本都识别出功能特性。</p>
+<p>一段来自代码中的注释</p>
+<p> <code>A collection of functions that together represent a &quot;feature&quot; in pods that are launched for Spark drivers and executors.</code></p>
+<p>就是给Spark drivers 和 executors定义运行环境的功能集。如果我们想给它添加特定的运行环境，只需要定义一个功能子类实现<code>KubernetesFeatureConfigStep</code>接口即可。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+<p><a href="https://cloud.tencent.com/developer/article/1674888">Spark on K8S feature分析</a></p>
+]]></content>
+      <categories>
+        <category>Spark On K8S系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>Spark on K8S Scheduler分析</title>
     <url>/2021/03/23/Spark/Spark-On-K8S-4/</url>
     <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Spark Kubernetes采用了跟Yarn类似的方式集成到了Spark中，Kubernetes作为一个新的Resource manager供Spark使用，具体来说：</p>
@@ -201,58 +253,6 @@
 
 
 <h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
-]]></content>
-      <categories>
-        <category>Spark On K8S系列</category>
-      </categories>
-      <tags>
-        <tag>spark</tag>
-        <tag>k8s</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Spark on K8S Feature分析</title>
-    <url>/2021/03/23/Spark/Spark-On-K8S-3/</url>
-    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在Spark App的执行过程中，有两种进程：Driver和Executor，这两种进程都会运行在K8S的Pod中，那么Driver和Executor运行的Pod环境是什么样的呢？又是如何定义呢？这就是feature包的作用了。</p>
-<a id="more"></a>
-
-<p>这篇博客所分析的代码路径</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">~&#x2F;Bigdata&#x2F;spark&#x2F;resource-managers&#x2F;kubernetes&#x2F;core&#x2F;src&#x2F;main&#x2F;scala&#x2F;org&#x2F;apache&#x2F;spark&#x2F;deploy&#x2F;k8s&#x2F;features</span><br></pre></td></tr></table></figure>
-<h2 id="Driver和Executor的创建"><a href="#Driver和Executor的创建" class="headerlink" title="Driver和Executor的创建"></a>Driver和Executor的创建</h2><h3 id="Driver的创建"><a href="#Driver的创建" class="headerlink" title="Driver的创建"></a>Driver的创建</h3><ol>
-<li><p>KubernetesClientApplication的入口方法start，调用自己的run 方法</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class KubernetesClientApplication extends SparkApplication &#123;</span><br><span class="line"></span><br><span class="line">  override def start(args: Array[String], conf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    val parsedArguments &#x3D; ClientArguments.fromCommandLineArgs(args)</span><br><span class="line">    run(parsedArguments, conf)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  private def run(clientArguments: ClientArguments, sparkConf: SparkConf): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">   Utils.tryWithResource(SparkKubernetesClientFactory.createKubernetesClient(</span><br><span class="line">      master,</span><br><span class="line">      Some(kubernetesConf.namespace),</span><br><span class="line">      KUBERNETES_AUTH_SUBMISSION_CONF_PREFIX,</span><br><span class="line">      SparkKubernetesClientFactory.ClientType.Submission,</span><br><span class="line">      sparkConf,</span><br><span class="line">      None,</span><br><span class="line">      None)) &#123; kubernetesClient &#x3D;&gt;</span><br><span class="line">        &#x2F;&#x2F;创建client并运行</span><br><span class="line">        val client &#x3D; new Client(</span><br><span class="line">          kubernetesConf,</span><br><span class="line">          new KubernetesDriverBuilder(),</span><br><span class="line">          kubernetesClient,</span><br><span class="line">          watcher)</span><br><span class="line">        client.run()</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-</li>
-<li><p>Client的run方法创建Driver</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private[spark] class Client(</span><br><span class="line">    conf: KubernetesDriverConf,</span><br><span class="line">    builder: KubernetesDriverBuilder,</span><br><span class="line">    kubernetesClient: KubernetesClient,</span><br><span class="line">    watcher: LoggingPodStatusWatcher) extends Logging &#123;</span><br><span class="line"></span><br><span class="line">  def run(): Unit &#x3D; &#123;</span><br><span class="line">    &#x2F;&#x2F;重点-&gt; 构建Pod的Spec即buildFromFeatures</span><br><span class="line">    val resolvedDriverSpec &#x3D; builder.buildFromFeatures(conf, kubernetesClient)</span><br><span class="line">    ...</span><br><span class="line">    val resolvedDriverPod &#x3D; new PodBuilder(resolvedDriverSpec.pod.pod)</span><br><span class="line">      .editSpec()</span><br><span class="line">        .addToContainers(resolvedDriverContainer)</span><br><span class="line">        .addNewVolume()</span><br><span class="line">          .withName(SPARK_CONF_VOLUME_DRIVER)</span><br><span class="line">          .withNewConfigMap()</span><br><span class="line">            .withItems(KubernetesClientUtils.buildKeyToPathObjects(confFilesMap).asJava)</span><br><span class="line">            .withName(configMapName)</span><br><span class="line">            .endConfigMap()</span><br><span class="line">          .endVolume()</span><br><span class="line">        .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    ...</span><br><span class="line">    &#x2F;&#x2F;调用kubernetesClient去创建Pod</span><br><span class="line">    val createdDriverPod &#x3D; kubernetesClient.pods().create(resolvedDriverPod)</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-</li>
-</ol>
-<p>所以呢？<code>Driver</code>的创建依赖于<code>KubernetesDriverBuilder</code>的<code>buildFromFeatures</code>方法</p>
-<h3 id="Executor的创建"><a href="#Executor的创建" class="headerlink" title="Executor的创建"></a>Executor的创建</h3><ol>
-<li><p>ExecutorPodsAllocator的start方法</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def start(applicationId: String): Unit &#x3D; &#123;</span><br><span class="line">  snapshotsStore.addSubscriber(podAllocationDelay) &#123;</span><br><span class="line">    onNewSnapshots(applicationId, _)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-</li>
-<li><p>ExecutorPodsAllocator的onNewSnapshots方法</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def onNewSnapshots(</span><br><span class="line">    applicationId: String,</span><br><span class="line">    snapshots: Seq[ExecutorPodsSnapshot]): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    if (newlyCreatedExecutorsForRpId.isEmpty</span><br><span class="line">      &amp;&amp; knownPodCount &lt; targetNum) &#123;</span><br><span class="line">      requestNewExecutors(targetNum, knownPodCount, applicationId, rpId)</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-</li>
-<li><p>ExecutorPodsAllocator的requestNewExecutors方法</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">private def requestNewExecutors(</span><br><span class="line">    expected: Int,</span><br><span class="line">    running: Int,</span><br><span class="line">    applicationId: String,</span><br><span class="line">    resourceProfileId: Int): Unit &#x3D; &#123;</span><br><span class="line">    ...</span><br><span class="line">    val resolvedExecutorSpec &#x3D; executorBuilder.buildFromFeatures(executorConf, secMgr,</span><br><span class="line">      kubernetesClient, rpIdToResourceProfile(resourceProfileId))      </span><br><span class="line">    ...</span><br><span class="line">    val podWithAttachedContainer &#x3D; new PodBuilder(executorPod.pod)</span><br><span class="line">      .editOrNewSpec()</span><br><span class="line">      .addToContainers(executorPod.container)</span><br><span class="line">      .endSpec()</span><br><span class="line">      .build()</span><br><span class="line">    val createdExecutorPod &#x3D; kubernetesClient.pods().create(podWithAttachedContainer)</span><br><span class="line">    ...</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">   </span><br></pre></td></tr></table></figure>
-<p>所以呢？<code>Executor</code>的创建依赖于<code>KubernetesExecutorBuilder</code>的<code>buildFromFeatures</code>方法</p>
-</li>
-</ol>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>不管是Driver还是Executor都是通过kubernetesClient客户端调用create的方法创建，只是传入的PodBuilder参数不同，创建时机不同。在构建PodBuilder的过程中，使用了feature包的各种配置进行组装。</p>
-<p><img src="/images/spark/image010.png"></p>
-<h2 id="feature"><a href="#feature" class="headerlink" title="feature"></a>feature</h2><p><img src="/images/spark/image011.png"></p>
-<p>先看一下<code>KubernetesFeatureConfigStep</code>，这个是基础接口，后面的实现类其实非常简单，从类名上基本都识别出功能特性。</p>
-<p>一段来自代码中的注释</p>
-<p> <code>A collection of functions that together represent a &quot;feature&quot; in pods that are launched for Spark drivers and executors.</code></p>
-<p>就是给Spark drivers 和 executors定义运行环境的功能集。如果我们想给它添加特定的运行环境，只需要定义一个功能子类实现<code>KubernetesFeatureConfigStep</code>接口即可。</p>
-<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
-<p><a href="https://cloud.tencent.com/developer/article/1674888">Spark on K8S feature分析</a></p>
 ]]></content>
       <categories>
         <category>Spark On K8S系列</category>
@@ -375,38 +375,78 @@
       </tags>
   </entry>
   <entry>
-    <title>Spark SQL</title>
-    <url>/2021/03/23/Spark/Spark-SQL-1/</url>
-    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+    <title>SparkSession</title>
+    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-1/</url>
+    <content><![CDATA[<p>从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。</p>
+<a id="more"></a>
+
+<p>以SparkPi为例</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">object SparkPi &#123;</span><br><span class="line">  def main(args: Array[String]): Unit &#x3D; &#123;</span><br><span class="line">    val spark &#x3D; SparkSession</span><br><span class="line">      .builder</span><br><span class="line">      .appName(&quot;Spark Pi&quot;)</span><br><span class="line">      .getOrCreate()</span><br><span class="line">    val slices &#x3D; if (args.length &gt; 0) args(0).toInt else 2</span><br><span class="line">    val n &#x3D; math.min(100000L * slices, Int.MaxValue).toInt &#x2F;&#x2F; avoid overflow</span><br><span class="line">    val count &#x3D; spark.sparkContext.parallelize(1 until n, slices).map &#123; i &#x3D;&gt;</span><br><span class="line">      val x &#x3D; random * 2 - 1</span><br><span class="line">      val y &#x3D; random * 2 - 1</span><br><span class="line">      if (x*x + y*y &lt;&#x3D; 1) 1 else 0</span><br><span class="line">    &#125;.reduce(_ + _)</span><br><span class="line">    println(s&quot;Pi is roughly $&#123;4.0 * count &#x2F; (n - 1)&#125;&quot;)</span><br><span class="line">    spark.stop()</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看出SparkSession是使用Spark功能API的入口，采用的builder模式进行创建和使用</p>
+<h2 id="Builder模式"><a href="#Builder模式" class="headerlink" title="Builder模式"></a>Builder模式</h2><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">val spark &#x3D; SparkSession.builder</span><br></pre></td></tr></table></figure>
+<p>其实就是返回了一个Builder对象</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def builder(): Builder &#x3D; new Builder</span><br></pre></td></tr></table></figure>
+<p>在SparkSession的伴生对象中，有一个内部类Builder的定义</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">class Builder extends Logging &#123;</span><br><span class="line"></span><br><span class="line">    private[this] val options &#x3D; new scala.collection.mutable.HashMap[String, String]</span><br><span class="line"></span><br><span class="line">    private[this] val extensions &#x3D; new SparkSessionExtensions</span><br><span class="line"></span><br><span class="line">    ...</span><br><span class="line">    </span><br><span class="line">    def getOrCreate(): SparkSession &#x3D; synchronized</span><br><span class="line">    ...</span><br><span class="line">&#125;    </span><br></pre></td></tr></table></figure>
+<p>可以看到Builder重要的功能点包括：</p>
+<ul>
+<li>设置options</li>
+<li>设置extensions（扩展SparkSession属性）</li>
+<li>获取或创建SparkSession</li>
+</ul>
+<h3 id="设置options"><a href="#设置options" class="headerlink" title="设置options"></a>设置options</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def config(key: String, value: String): Builder &#x3D; synchronized &#123;</span><br><span class="line">      options +&#x3D; key -&gt; value</span><br><span class="line">      this</span><br><span class="line">&#125;</span><br><span class="line">...</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>各种重载的config方法</p>
+<h3 id="设置extensions"><a href="#设置extensions" class="headerlink" title="设置extensions"></a>设置extensions</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;**</span><br><span class="line"> * Inject extensions into the [[SparkSession]]. This allows a user to add Analyzer rules,</span><br><span class="line"> * Optimizer rules, Planning Strategies or a customized parser.</span><br><span class="line"> *</span><br><span class="line"> * @since 2.2.0</span><br><span class="line"> *&#x2F;</span><br><span class="line">def withExtensions(f: SparkSessionExtensions &#x3D;&gt; Unit): Builder &#x3D; synchronized &#123;</span><br><span class="line">  f(extensions)</span><br><span class="line">  this</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>从注释上可以看到，扩展SparkSession，主要目的是允许用户添加分析器规则、优化器规则、执行计划策略和解析器。</p>
+<h3 id="获取或创建SparkSession"><a href="#获取或创建SparkSession" class="headerlink" title="获取或创建SparkSession"></a>获取或创建SparkSession</h3><p>一段来自代码中的注释</p>
+<p><em>Gets an existing [[SparkSession]] or, if there is no existing one, creates a new one based on the options set in this builder. This method first checks whether there is a valid thread-local SparkSession, and if yes, return that one. It then checks whether there is a valid global default SparkSession, and if yes, return that one. If no valid global default SparkSession exists, the method creates a new SparkSession and assigns the newly created SparkSession as the global default. In case an existing SparkSession is returned, the non-static config options specified in this builder will be applied to the existing SparkSession.</em></p>
+<p>获取或创建一个SparkSession，如果存在可用的SparkSession的话，返回SparkSession并config动态配置，否则创建新的SparkSession</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">def getOrCreate(): SparkSession &#x3D; synchronized &#123;</span><br><span class="line">      &#x2F;&#x2F;生成SparkConf</span><br><span class="line">      val sparkConf &#x3D; new SparkConf()</span><br><span class="line">      options.foreach &#123; case (k, v) &#x3D;&gt; sparkConf.set(k, v) &#125;</span><br><span class="line">      ...</span><br><span class="line">      &#x2F;&#x2F; Get the session from current thread&#39;s active session.</span><br><span class="line">      &#x2F;&#x2F; 返回当前Thread可用的SparkSession</span><br><span class="line">      var session &#x3D; activeThreadSession.get()</span><br><span class="line">      if ((session ne null) &amp;&amp; !session.sparkContext.isStopped) &#123;</span><br><span class="line">        applyModifiableSettings(session)</span><br><span class="line">        return session</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      &#x2F;&#x2F; Global synchronization so we will only set the default session once.</span><br><span class="line">      &#x2F;&#x2F; 获取全局可用的SparkSession或者创建SparkSession</span><br><span class="line">      SparkSession.synchronized &#123;</span><br><span class="line">        &#x2F;&#x2F; If the current thread does not have an active session, get it from the global session.</span><br><span class="line">        &#x2F;&#x2F; 获取全局可用的SparkSession</span><br><span class="line">        session &#x3D; defaultSession.get()</span><br><span class="line">        if ((session ne null) &amp;&amp; !session.sparkContext.isStopped) &#123;</span><br><span class="line">          applyModifiableSettings(session)</span><br><span class="line">          return session</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        &#x2F;&#x2F; No active nor global default session. Create a new one.</span><br><span class="line">        &#x2F;&#x2F; 创建SparkSession：分Step1、Step2、Step3</span><br><span class="line">        &#x2F;&#x2F; Step1: 创建SparkContext</span><br><span class="line">        val sparkContext &#x3D; userSuppliedContext.getOrElse &#123;</span><br><span class="line">          &#x2F;&#x2F; set a random app name if not given.</span><br><span class="line">          if (!sparkConf.contains(&quot;spark.app.name&quot;)) &#123;</span><br><span class="line">            sparkConf.setAppName(java.util.UUID.randomUUID().toString)</span><br><span class="line">          &#125;</span><br><span class="line"></span><br><span class="line">          SparkContext.getOrCreate(sparkConf)</span><br><span class="line">          &#x2F;&#x2F; Do not update &#96;SparkConf&#96; for existing &#96;SparkContext&#96;, as it&#39;s shared by all sessions.</span><br><span class="line">        &#125;</span><br><span class="line">        &#x2F;&#x2F; Step2: 应用扩展特性</span><br><span class="line">        applyExtensions(</span><br><span class="line">          sparkContext.getConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS).getOrElse(Seq.empty),</span><br><span class="line">          extensions)</span><br><span class="line">        &#x2F;&#x2F; Step3: 创建SparkSession</span><br><span class="line">        session &#x3D; new SparkSession(sparkContext, None, None, extensions, options.toMap)</span><br><span class="line">        setDefaultSession(session)</span><br><span class="line">        setActiveSession(session)</span><br><span class="line">        registerContextListener(sparkContext)</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      return session</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<h2 id="SparkSession伴生类"><a href="#SparkSession伴生类" class="headerlink" title="SparkSession伴生类"></a>SparkSession伴生类</h2><p><em>The entry point to programming Spark with the Dataset and DataFrame API.</em></p>
+<p>从上面的getOrCreate方法，我们可以了解到</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">new SparkSession(sparkContext, None, None, extensions, options.toMap)</span><br></pre></td></tr></table></figure>
+<p>SparkSession入参有5个</p>
+<ul>
+<li>SparkContext： Spark上下文</li>
+<li>Option[SharedState] ： 如果提供，则使用现有的共享状态</li>
+<li>Option[SessionState]： 如果提供，继承会话状态，包括临时视图、SQL配置、UDF等。</li>
+<li>SparkSessionExtensions： 扩展特性</li>
+<li>Map[String, String] ： 配置conf集合</li>
+</ul>
+<h3 id="SharedState"><a href="#SharedState" class="headerlink" title="SharedState"></a>SharedState</h3><p><em>A class that holds all state shared across sessions in a given [[SQLContext]].</em></p>
+<p>基于给定的SQLContext来维护所有跨session共享的状态。</p>
+<h3 id="SessionState"><a href="#SessionState" class="headerlink" title="SessionState"></a>SessionState</h3><p><em>A class that holds all session-specific state in a given [[SparkSession]].</em></p>
+<p>维护给定的SparkSession的session级别的状态。</p>
+<ul>
+<li>sharedState 跨会话共享的状态，如全局视图、外部的catalog</li>
+<li>conf SQL的KV配置</li>
+<li>experimentalMethods 实验方法接口，用于添加自定义规则策略和优化器</li>
+<li>functionRegistry 函数注册目录，用于管理用户注册的函数</li>
+<li>udfRegistration UDF注册接口，用于注册用户自定义函数</li>
+<li>catalogBuilder 用于创建内部目录管理表和DB</li>
+<li>sqlParser SQL解析器</li>
+<li>analyzerBuilder SQL分析器构建器</li>
+<li>optimizerBuilder SQL优化器</li>
+<li>planner SQL执行计划</li>
+<li>streamingQueryManagerBuilder 流查询管理器的Builder</li>
+<li>resourceLoaderBuilder 资源加载器，用于加载跨session共享的jar或者文件</li>
+<li>createQueryExecution 创建QueryExecution的函数对象</li>
+<li>createClone 创建session副本的函数对象</li>
+</ul>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
 ]]></content>
       <categories>
-        <category>Spark SQL系列</category>
+        <category>Spark基础系列</category>
       </categories>
       <tags>
         <tag>spark</tag>
       </tags>
   </entry>
   <entry>
-    <title>SparkSession</title>
-    <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-1/</url>
-    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。</p>
+    <title>Spark SchedulerBackend</title>
+    <url>/2021/03/26/Spark/Spark%E5%9F%BA%E7%A1%80-10/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在Spark中有一个核心模块调度器（Scheduler），这个核心模块Scheduler是在SparkContext的创建过程中完成初始化。这个Scheduler是面向应用的调度，跟ClusterManager面向资源的调度是由本质的区别的。</p>
 <a id="more"></a>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -769,9 +809,26 @@
       </tags>
   </entry>
   <entry>
+    <title>Spark TaskScheduler</title>
+    <url>/2021/03/26/Spark/Spark%E5%9F%BA%E7%A1%80-9/</url>
+    <content><![CDATA[<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在Spark中有一个核心模块调度器（Scheduler），这个核心模块Scheduler是在SparkContext的创建过程中完成初始化。这个Scheduler是面向应用的调度，跟ClusterManager面向资源的调度是由本质的区别的。</p>
+<a id="more"></a>
+
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark基础系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>Spark源码分析系列</title>
     <url>/2021/03/23/Spark/Spark%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E7%B3%BB%E5%88%97/</url>
-    <content><![CDATA[<p>Spark源码分析系列是自己在学习Spark过程中的总结和记录，基于Spark3.0版本，一共分为三个子系列</p>
+    <content><![CDATA[<p>Spark源码分析系列是自己在学习Spark过程中的总结和记录，基于Spark3+版本，一共分为三个子系列</p>
 <a id="more"></a>
 
 <ul>
@@ -779,6 +836,7 @@
 <li>Spark On K8S系列</li>
 <li>Spark SQL系列</li>
 </ul>
+<p><a href="http://www.mobanche.top/2021/03/25/Spark/Spark%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%8E%AF%E5%A2%83/">Spark源码阅读和调试</a></p>
 <h2 id="Spark基础系列"><a href="#Spark基础系列" class="headerlink" title="Spark基础系列"></a>Spark基础系列</h2><ul>
 <li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-1/">1</a></li>
 <li><a href="http://www.mobanche.top/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-2/">2</a></li>
@@ -932,6 +990,358 @@
       <tags>
         <tag>WSL2</tag>
         <tag>systemctl</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Support ANSI SQL INTERVAL TYPES[SPARK-27790]</title>
+    <url>/2021/05/19/Spark/Spark-SQL-1/</url>
+    <content><![CDATA[<p><a href="https://issues.apache.org/jira/browse/SPARK-27790">SPARK-27790</a> Support ANSI SQL INTERVAL Types</p>
+<p>本文主要对Spark SQL中添加ANSI SQL INTERVAL 类型的背景、开发过程、代码做了简单的梳理总结，目前分析还不够深入，因为我只是学习了各个PR的代码。相比每个PR的代码来说，PR的评论、Review意见是更值得深入思考的地方，这个还是需要一定的时间消化。</p>
+<p>未完待续，持续更新</p>
+<a id="more"></a>
+
+<p>其实Spark SQL中是有INTERVAL的数据类型的，但是其实是不好用的：</p>
+<ul>
+<li>已有的INTERVAL数据类型不支持持久化</li>
+<li>已有的INTERVAL数据类型不能够比较，举个例子“1 Month 1 Day” is equal to “1 Month 1 Day” ？，由于一个月到底是30天呢，还是31天，更或者是28/29天，都不确定，导致了已有的INTERVAL数据类型无法进行比较</li>
+</ul>
+<p>介于上面的背景，Spark社区引入两种符合ANSI SQL 标准的INTERVAL的数据类型来替代现有的INTERVAL数据类型：</p>
+<ul>
+<li>YEAR-MONTH/DAY-SECOND </li>
+<li>两种类型中的字段是可以比较可排序</li>
+<li>两种类型支持日期类型的计算</li>
+<li>可以持久化</li>
+</ul>
+<p>两种风格的INTERVAL数据类型将在一段时间内并存。</p>
+<p>目前<a href="https://issues.apache.org/jira/browse/SPARK-27790">SPARK-27790</a>还在开发中，Spark3.2版本Milestone1就会完成.</p>
+<p>相关SubTask汇总如下：</p>
+<ul>
+<li><p>类型定义和外部输入类型：<a href="https://issues.apache.org/jira/browse/SPARK-27793">SPARK-27793</a> <a href="https://issues.apache.org/jira/browse/SPARK-34605">SPARK-34605</a> <a href="https://issues.apache.org/jira/browse/SPARK-34615">SPARK-34615</a> </p>
+</li>
+<li><p>expressions处理</p>
+<ul>
+<li>Cast：<a href="https://issues.apache.org/jira/browse/SPARK-34667">SPARK-34667</a> <a href="https://issues.apache.org/jira/browse/SPARK-34668">SPARK-34668</a></li>
+<li>UnaryMinus/Add/Subtract:  <a href="https://issues.apache.org/jira/browse/SPARK-34677">SPARK-34677</a></li>
+<li>Sum: <a href="https://issues.apache.org/jira/browse/SPARK-34716">SPARK-34716</a></li>
+<li>DateAddYMInterval/(AddMonthsBase-&gt;AddMonths): <a href="https://issues.apache.org/jira/browse/SPARK-34721">SPARK-34721</a></li>
+<li>TimeAdd: <a href="https://issues.apache.org/jira/browse/SPARK-34761">SPARK-34761</a> <a href="https://issues.apache.org/jira/browse/SPARK-35051">SPARK-35051</a></li>
+<li>MultiplyYMInterval：<a href="https://issues.apache.org/jira/browse/SPARK-34824">SPARK-34824</a> </li>
+<li>Average: <a href="https://issues.apache.org/jira/browse/SPARK-34837">SPARK-34837</a> </li>
+<li>MultiplyDTInterval: <a href="https://issues.apache.org/jira/browse/SPARK-34850">SPARK-34850</a></li>
+<li>DivideYMInterval/DivideDTInterval : <a href="https://issues.apache.org/jira/browse/SPARK-34868">SPARK-34868</a>  <a href="https://issues.apache.org/jira/browse/SPARK-34875">SPARK-34875</a></li>
+<li>SubtractDates ： <a href="https://issues.apache.org/jira/browse/SPARK-34896">SPARK-34896</a> </li>
+<li>extract/date_part ： <a href="https://issues.apache.org/jira/browse/SPARK-35091">SPARK-35091</a></li>
+<li>SubtractTimestamps ： <a href="https://issues.apache.org/jira/browse/SPARK-34903">SPARK-34903</a></li>
+<li>Sequence： <a href="https://issues.apache.org/jira/browse/SPARK-35088">SPARK-35088</a> </li>
+<li>Hash：<a href="https://issues.apache.org/jira/browse/SPARK-35113">SPARK-35113</a> </li>
+<li></li>
+</ul>
+</li>
+<li><p>Hive相关：<a href="https://issues.apache.org/jira/browse/SPARK-35016">SPARK-35016</a> <a href="https://issues.apache.org/jira/browse/SPARK-35017">SPARK-35017</a> <a href="https://issues.apache.org/jira/browse/SPARK-35018">SPARK-35018</a> <a href="https://issues.apache.org/jira/browse/SPARK-35228">SPARK-35228</a> <a href="https://issues.apache.org/jira/browse/SPARK-35228">SPARK-35228</a></p>
+</li>
+</ul>
+<p>从这个Task的背景已经相关SubTask的汇总来看，添加ANSI SQL INTERVAL 这条主线能够涵盖Spark SQL的每个知识点，对于想参与Spark社区开发的新人我来说，是一个非常好的学习实践的机会.</p>
+<h2 id="核心SubTask"><a href="#核心SubTask" class="headerlink" title="核心SubTask"></a>核心SubTask</h2><h3 id="SPARK-27793"><a href="#SPARK-27793" class="headerlink" title="SPARK-27793"></a>SPARK-27793</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-27793">SPARK-27793</a> Add ANSI SQL day-time and year-month interval types</p>
+<p>扩展Catalyst的数据类型，引入两个符合ANSI SQL标准的数据类型</p>
+<ul>
+<li><code>DayTimeIntervalType</code> </li>
+<li><code>YearMonthIntervalType</code> </li>
+</ul>
+<p><a href="https://github.com/apache/spark/pull/31614">PR分析</a>：</p>
+<ol>
+<li><p>在<code>DataTypes.java</code>文件中增加获取数据类型<code>DayTimeIntervalType/YearMonthIntervalType</code> </p>
+</li>
+<li><p>定义<code>DayTimeIntervalType/YearMonthIntervalType</code> 数据类型</p>
+<ul>
+<li><p><code>DayTimeIntervalType</code>：</p>
+<ol>
+<li><p>内部使用<code>Long</code>来表示这个数据类型</p>
+</li>
+<li><p>计算规则：-/+ (24<em>60</em>60 * DAY + 60*60 * HOUR + 60 * MINUTE + SECOND) * 1000000</p>
+<p>所以数值的单位是<code>microseconds</code></p>
+</li>
+</ol>
+</li>
+<li><p><code>YearMonthIntervalType</code> ：</p>
+<ol>
+<li>内部使用<code>Int</code>来表示这个数据类型</li>
+<li>计算规则： -/+ (12 * YEAR + MONTH)，所以数值的单位是Month</li>
+</ol>
+</li>
+</ul>
+</li>
+</ol>
+<p>重点说明：</p>
+<p><img src="/images/spark/image030.png" alt="image030"></p>
+<p>根据SQL规范，INTERVAL类型的各个字段是不可以为负的，但是本身INTERVAL值可以为负。</p>
+<h3 id="SPARK-34605"><a href="#SPARK-34605" class="headerlink" title="SPARK-34605"></a>SPARK-34605</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34605">SPARK-34605</a> Support java.time.Duration as an external type of the day-time interval type</p>
+<p>该SubTask的目标是能够使并行数据集合中的<code>java.time.Duration</code>可以转成Catalyst的<code>DayTimeIntervalType</code>数据类型，更直观点说，该Task达到以下目的：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">scala&gt; val ds &#x3D; Seq(java.time.Duration.ofDays(10)).toDS</span><br><span class="line">ds: org.apache.spark.sql.Dataset[java.time.Duration] &#x3D; [value: interval day to second]</span><br><span class="line"></span><br><span class="line">###注意：typeName已经由daytimeinterval变成了interval day to sceond</span><br><span class="line"></span><br><span class="line">scala&gt; ds.collect</span><br><span class="line">res0: Array[java.time.Duration] &#x3D; Array(PT240H)</span><br></pre></td></tr></table></figure>
+<p><a href="https://github.com/apache/spark/pull/31729">PR分析</a></p>
+<ol>
+<li>添加了<code>DurationConverter</code>方法把<code>java.time.Duration</code>类型转成Catalyst内部DataType（DayTimeIntervalType）<ul>
+<li><code>durationToMicros()</code>, 把<code>Duration</code>转成<code>microseconds</code>.用<code>Long</code>来表示.</li>
+<li><code>microsToDuration()</code>,把<code>microseconds</code>转成<code>Duration</code>.返回<code>Duration</code>类型.</li>
+</ul>
+</li>
+<li>提供了两个方法<code>createDeserializerForDuration</code>和<code>createSerializerForJavaDuration</code>方法，用于<code>Encoder</code> <code>DayTimeIntervalType</code>数据类型</li>
+<li>扩展了<code>Literal</code>，从<code>java.time.Duration</code>类型构造<code>DayTimeIntervalType</code>类型</li>
+</ol>
+<p>附：这个SubTask比较核心，涉及了很多Catalyst的东西，包括数据类型转化，RowEncoder、数据读取、CodeGenerator等</p>
+<h3 id="SPARK-34615"><a href="#SPARK-34615" class="headerlink" title="SPARK-34615"></a>SPARK-34615</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34615">SPARK-34615</a> Support java.time.Period as an external type of the year-month interval type</p>
+<p><a href="https://github.com/apache/spark/pull/31765">PR分析</a></p>
+<p>关于这个SubTask的分析，基本同上SPARK-34605</p>
+<h3 id="SPARK-34667"><a href="#SPARK-34667" class="headerlink" title="SPARK-34667"></a>SPARK-34667</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34667">SPARK-34667</a> Support casting of year-month interval to string</p>
+<p>该SubTask就是增加了把year-month interval 转成string，效果如下：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">scala&gt; import org.apache.spark.sql.catalyst.expressions.&#123;Literal, Cast&#125;</span><br><span class="line">import org.apache.spark.sql.catalyst.expressions.&#123;Literal, Cast&#125;</span><br><span class="line"></span><br><span class="line">scala&gt; import org.apache.spark.sql.types._</span><br><span class="line">import org.apache.spark.sql.types._</span><br><span class="line"></span><br><span class="line">scala&gt; Cast(Literal(java.time.Period.ofMonths(1)), StringType)</span><br><span class="line">res0: org.apache.spark.sql.catalyst.expressions.Cast &#x3D; cast(INTERVAL &#39;0-1&#39; YEAR TO MONTH as string)</span><br></pre></td></tr></table></figure>
+<p><a href="https://github.com/apache/spark/pull/32056">PR分析</a></p>
+<ol>
+<li>扩展<code>Cast expression</code></li>
+<li>在<code>IntervalUtils</code>中增加<code>toYearMonthIntervalString()</code>方法</li>
+</ol>
+<h3 id="SPARK-34668"><a href="#SPARK-34668" class="headerlink" title="SPARK-34668"></a>SPARK-34668</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34668">SPARK-34668</a> Support casting of day-time intervals to strings</p>
+<p><a href="https://github.com/apache/spark/pull/32070">PR分析</a></p>
+<p>同<a href="https://issues.apache.org/jira/browse/SPARK-34667">SPARK-34667</a></p>
+<h3 id="SPARK-34677"><a href="#SPARK-34677" class="headerlink" title="SPARK-34677"></a>SPARK-34677</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34677">SPARK-34677</a> Support add and subtract of ANSI SQL intervals</p>
+<p>该SubTask的目标是在<code>DayTimeIntervalType</code>和<code>YearMonthIntervalType</code>上支持 <code>+/-</code>运算</p>
+<p><a href="https://github.com/apache/spark/pull/31789">PR分析</a></p>
+<p>TODO</p>
+<h3 id="SPARK-34716"><a href="#SPARK-34716" class="headerlink" title="SPARK-34716"></a>SPARK-34716</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34716">SPARK-34716</a> Support ANSI SQL intervals by the aggregate function sum</p>
+<p>该SubTask的目标是在<code>sum</code>表达式中增加了<code>DayTimeIntervalType</code>和<code>YearMonthIntervalType</code>类型的支持。</p>
+<p><a href="https://github.com/apache/spark/pull/32107">PR分析</a></p>
+<h3 id="SPARK-34721"><a href="#SPARK-34721" class="headerlink" title="SPARK-34721"></a>SPARK-34721</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34721">SPARK-34721</a> Add an year-month interval to a date</p>
+<p>该SubTask的目标是支持 <code>date</code> 加/减 <code>year-month interval</code>, 最终返回<code>date</code>类型</p>
+<p><a href="https://github.com/apache/spark/pull/31812">PR分析</a></p>
+<h3 id="SPARK-34739"><a href="#SPARK-34739" class="headerlink" title="SPARK-34739"></a>SPARK-34739</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34739">SPARK-34739</a> Add an year-month interval to a timestamp</p>
+<p><a href="https://github.com/apache/spark/pull/31861">PR分析</a></p>
+<h3 id="SPARK-34761"><a href="#SPARK-34761" class="headerlink" title="SPARK-34761"></a>SPARK-34761</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34761">SPARK-34761</a> Add a day-time interval to a timestamp</p>
+<p>该SubTask实现了<code>timestamp</code> +/- <code>day-time interval</code>的功能</p>
+<p><a href="https://github.com/apache/spark/pull/31855">PR分析</a></p>
+<h3 id="SPARK-34824"><a href="#SPARK-34824" class="headerlink" title="SPARK-34824"></a>SPARK-34824</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34824">SPARK-34824</a> Multiply year-month interval by numeric</p>
+<p>该SubTask新加了<code>MultiplyYMInterval</code>实现了 <code>numeric * year-month interval</code>的功能</p>
+<p>同时扩展了<code>arithmetic rules</code>支持 <code>numeric * year-month interval</code> 和 <code>year-month interval * numeric</code></p>
+<p><a href="https://github.com/apache/spark/pull/31929">PR分析</a></p>
+<h3 id="SPARK-34837"><a href="#SPARK-34837" class="headerlink" title="SPARK-34837"></a>SPARK-34837</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34837">SPARK-34837</a> Support ANSI SQL intervals by the aggregate function avg</p>
+<p>该SubTask扩展了<code>Average expression</code>来支持<code>DayTimeIntervalType</code>和<code>YearMonthIntervalType</code>数据类型</p>
+<p><a href="https://github.com/apache/spark/pull/32358">PR分析</a></p>
+<h3 id="SPARK-34850"><a href="#SPARK-34850" class="headerlink" title="SPARK-34850"></a>SPARK-34850</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34850">SPARK-34850</a> Multiply day-time interval by numeric</p>
+<p>该SubTask新加了<code>MultiplyDTInterval</code>实现了 <code>numberic * day-time interval</code>的功能</p>
+<p>同时扩展了<code>arithmetic rules</code>支持 <code>numeric * day-time interval</code> 和 <code>day-time interval * numeric</code></p>
+<p><a href="https://github.com/apache/spark/pull/31951">PR分析</a></p>
+<h3 id="SPARK-34868"><a href="#SPARK-34868" class="headerlink" title="SPARK-34868"></a>SPARK-34868</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34868">SPARK-34868</a> Divide year-month interval by numeric</p>
+<p>该SubTask新加了<code>DivideYMInterval</code>实现了 <code>year-month interval / numberic</code></p>
+<p>同时扩展了<code>arithmetic rules</code>支持<code>year-month interval / numberic</code></p>
+<p><a href="https://github.com/apache/spark/pull/31961">PR分析</a></p>
+<h3 id="SPARK-34875"><a href="#SPARK-34875" class="headerlink" title="SPARK-34875"></a>SPARK-34875</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34875">SPARK-34875</a> Divide day-time interval by numeric</p>
+<p>该SubTask新加了<code>DivideDTInterval</code>，实现了<code>day-time interval / numeric</code>的功能</p>
+<p>同时扩展了<code>arithmetic rules</code>支持<code>day-time interval / numeric</code></p>
+<p><a href="https://github.com/apache/spark/pull/31972">PR分析</a></p>
+<h3 id="SPARK-34879"><a href="#SPARK-34879" class="headerlink" title="SPARK-34879"></a>SPARK-34879</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34879">SPARK-34879</a> Hive inspect support DayTimeIntervalType and YearMonthIntervalType</p>
+<p><a href="https://github.com/apache/spark/pull/31979">PR分析</a></p>
+<h3 id="SPARK-34896"><a href="#SPARK-34896" class="headerlink" title="SPARK-34896"></a>SPARK-34896</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34896">SPARK-34896</a> Return day-time interval from dates subtraction</p>
+<p>该SubTask修改了<code>SubtractDates expression</code>，同时增加了<code>spark.sql.legacy.interval.enabled</code>参数，在参数设置为false(默认)的情况下，<code>SubtractDates</code>返回的结果类型为<code>DayTimeIntervalType</code></p>
+<p><a href="https://github.com/apache/spark/pull/31996">PR分析</a></p>
+<h3 id="SPARK-35091"><a href="#SPARK-35091" class="headerlink" title="SPARK-35091"></a>SPARK-35091</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35091">SPARK-35091</a> Support ANSI intervals by date_part()</p>
+<p>该SubTask扩展了<code>extract/date_part expression</code>，使得支持<code>ANSI Intervals</code></p>
+<p><a href="https://github.com/apache/spark/pull/32351">PR分析</a></p>
+<h3 id="SPARK-34903"><a href="#SPARK-34903" class="headerlink" title="SPARK-34903"></a>SPARK-34903</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34903">SPARK-34903</a> Return day-time interval from timestamps subtraction</p>
+<p>该SubTask修改了<code>SubtractTimestamps expression</code>，使它返回的结果数据类型为<code>DayTimeIntervalType</code></p>
+<p><a href="https://github.com/apache/spark/pull/32016">PR分析</a></p>
+<h3 id="SPARK-35129"><a href="#SPARK-35129" class="headerlink" title="SPARK-35129"></a>SPARK-35129</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35129">SPARK-35129</a> Construct year-month interval column from integral fields</p>
+<p>OPEN</p>
+<h3 id="SPARK-35111"><a href="#SPARK-35111" class="headerlink" title="SPARK-35111"></a>SPARK-35111</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35111">SPARK-35111</a> Cast string to year-month interval</p>
+<p><a href="https://github.com/apache/spark/pull/32444">PR分析</a></p>
+<h3 id="SPARK-35037"><a href="#SPARK-35037" class="headerlink" title="SPARK-35037"></a>SPARK-35037</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35037">SPARK-35037</a> Recognize sign before the interval string in literals</p>
+<p>扩展了SQL syntax rules，是它支持<code>year-month/day-time intervals</code> 前面带有负号.</p>
+<p><a href="https://github.com/apache/spark/pull/32134">PR分析</a></p>
+<p>在<code>visitUnitToUnitInterval</code>方法中增加负数的处理</p>
+<h3 id="SPARK-35051"><a href="#SPARK-35051" class="headerlink" title="SPARK-35051"></a>SPARK-35051</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35051">SPARK-35051</a> Add a day-time interval to a date</p>
+<p>该Subtask实现了 <code>date +/- day-time interval</code>的功能</p>
+<p><a href="https://github.com/apache/spark/pull/32170">PR分析</a></p>
+<ul>
+<li>先把<code>date</code>转成<code>timestamp</code></li>
+<li>然后<code>timestamp +/- day-time interval</code></li>
+</ul>
+<h3 id="SPARK-35076"><a href="#SPARK-35076" class="headerlink" title="SPARK-35076"></a>SPARK-35076</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35076">SPARK-35076</a> Parse interval literals as ANSI intervals</p>
+<p>IN PROCESSING</p>
+<h3 id="SPARK-35088"><a href="#SPARK-35088" class="headerlink" title="SPARK-35088"></a>SPARK-35088</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35088">SPARK-35088</a> Accept ANSI intervals by the Sequence expression</p>
+<p><code>Sequence expression</code>支持<code>year-month/day-time interval</code> 类型</p>
+<p><a href="https://github.com/apache/spark/pull/32492">PR分析</a></p>
+<h3 id="SPARK-35090"><a href="#SPARK-35090" class="headerlink" title="SPARK-35090"></a>SPARK-35090</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35090">SPARK-35090</a> Extract a field from ANSI interval</p>
+<p><a href="https://github.com/apache/spark/pull/32351">PR分析</a></p>
+<p>IN PROGRESS</p>
+<h3 id="SPARK-35099"><a href="#SPARK-35099" class="headerlink" title="SPARK-35099"></a>SPARK-35099</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35099">SPARK-35099</a> Convert ANSI interval literals to SQL string</p>
+<p>在<code>Literal</code>中的<code>sql()</code>和<code>toString()</code>方法中增加了<code>YearMonthIntervalType</code>和<code>DayTimeIntervalType</code>的处理</p>
+<p><a href="https://github.com/apache/spark/pull/32196">PR分析</a></p>
+<h3 id="SPARK-35107"><a href="#SPARK-35107" class="headerlink" title="SPARK-35107"></a>SPARK-35107</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35107">SPARK-35017</a> Parse unit-to-unit interval literals to ANSI intervals</p>
+<p>解析<code>unit-to-unit interval</code>成<code>YearMonthIntervalType</code>或者<code>DayTimeIntervalType</code></p>
+<p><a href="https://github.com/apache/spark/pull/32209">PR分析</a></p>
+<h3 id="SPARK-35110"><a href="#SPARK-35110" class="headerlink" title="SPARK-35110"></a>SPARK-35110</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35110">SPARK-35110</a> Handle ANSI intervals in WindowExecBase</p>
+<p>该SubTask的目标是<code>WindowExecBase</code>支持<code>YearMonthIntervalType</code>和<code>DayTimeIntervalType</code>数据类型</p>
+<p><a href="https://github.com/apache/spark/pull/32294">PR分析</a></p>
+<h3 id="SPARK-35113"><a href="#SPARK-35113" class="headerlink" title="SPARK-35113"></a>SPARK-35113</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35113">SPARK-35113</a> Support ANSI intervals in the Hash expression</p>
+<p>该SubTask在<code>Hash</code>表达式中增加了<code>YearMonthIntervalType</code>和<code>DayTimeIntervalType</code>的支持</p>
+<p><a href="https://github.com/apache/spark/pull/32259">PR分析</a></p>
+<h3 id="SPARK-35139"><a href="#SPARK-35139" class="headerlink" title="SPARK-35139"></a>SPARK-35139</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35139">SPARK-35139</a> Support ANSI intervals as Arrow Column vectors</p>
+<p><a href="https://github.com/apache/spark/pull/32340">PR分析</a></p>
+<h3 id="SPARK-35153"><a href="#SPARK-35153" class="headerlink" title="SPARK-35153"></a>SPARK-35153</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35153">SPARK-35153</a> Override sql() of ANSI interval operators</p>
+<p>重写了<code>sql()</code>方法，使运算表达式更加可读，</p>
+<p><a href="https://github.com/apache/spark/pull/32262">PR分析</a></p>
+<ol>
+<li><code>MultiplyYMInterval</code>中重写<code>sql()</code>方法</li>
+<li><code>MultiplyDTInterval</code>中重写<code>sql()</code>方法</li>
+<li><code>DivideYMInterval</code>中重写<code>sql()</code>方法</li>
+<li><code>DivideDTInterval</code>中重写<code>sql()</code>方法</li>
+<li><code>SubstractTimestamps</code>中重写<code>sql()</code>方法</li>
+</ol>
+<h3 id="SPARK-35243"><a href="#SPARK-35243" class="headerlink" title="SPARK-35243"></a>SPARK-35243</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35243">SPARK-35243</a> Support columnar execution on ANSI interval types</p>
+<p><a href="https://github.com/apache/spark/pull/32452">PR分析</a></p>
+<h3 id="SPARK-35285"><a href="#SPARK-35285" class="headerlink" title="SPARK-35285"></a>SPARK-35285</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35285">SPARK-35285</a> Parse ANSI interval types in SQL</p>
+<p>该SubTask的目的是增加SQL Parser功能，使得SQL Parser可以解析：</p>
+<ul>
+<li><code>INTERVAL YEAR TO MONTH</code> to <code>YearMonthIntervalType</code></li>
+<li><code>INTERVAL DAY TO SECOND</code> to <code>DayTimeIntervalType</code></li>
+</ul>
+<p><a href="https://github.com/apache/spark/pull/32409">PR分析</a></p>
+<ol>
+<li>在<code>SqlBase.g4</code>中增加 <code>INTERVAL YEAR TO MONTH / INTERVAL DAY TO SECOND</code>的解析规则</li>
+<li>在<code>AstBuilder.scala</code>中增加<code>YearMonthIntervalDataType/DayTimeIntervalType</code>的访问</li>
+</ol>
+<p>Spark提供了一个SqlBase.g4文件，编译的时候，会使用Antlr根据这个文件生成对应的词法解析和语法分析类，同时还使用了访问者模式，用于构建Logical Plan（语法树）。</p>
+<p>访问者模式简单说就是会去遍历生成的语法树（针对语法树中每个节点生成visit方法），以及返回相应的值。</p>
+<p>Spark通过AstBuilder继承SqlBaseBaseVisitor类，重写了对应节点的visit方法，实现了自己的访问逻辑。</p>
+<h2 id="其他SubTask"><a href="#其他SubTask" class="headerlink" title="其他SubTask"></a>其他SubTask</h2><h3 id="SPARK-34619"><a href="#SPARK-34619" class="headerlink" title="SPARK-34619"></a>SPARK-34619</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34619">SPARK-34619</a> Update the Spark SQL guide about day-time and year-month interval types</p>
+<p>目前处于open状态</p>
+<h3 id="SPARK-34663"><a href="#SPARK-34663" class="headerlink" title="SPARK-34663"></a>SPARK-34663</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34663">SPARK-34663</a> Test year-month and day-time intervals in UDF</p>
+<p><a href="https://github.com/apache/spark/pull/31779">PR分析</a></p>
+<p>其实这个也可以算是<a href="https://issues.apache.org/jira/browse/SPARK-34605">SPARK-34605</a>和<a href="https://issues.apache.org/jira/browse/SPARK-34615">SPARK-34615</a>的补充测试，在UDF中可以使用<code>Duration</code>和<code>Period</code>类型进行计算.</p>
+<h3 id="SPARK-34666"><a href="#SPARK-34666" class="headerlink" title="SPARK-34666"></a>SPARK-34666</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34666">SPARK-34666</a> Test DayTimeIntervalType/YearMonthIntervalType as ordered and atomic types</p>
+<p><a href="https://github.com/apache/spark/pull/31782">PR分析</a></p>
+<p>首先在SPARK中<code>DataType</code>上的测试类型包括以下：</p>
+<ol>
+<li>ArithmeticExpressionSuite:<ul>
+<li>“function least”</li>
+<li>“function greatest”</li>
+</ul>
+</li>
+<li>PredicateSuite<ul>
+<li>“BinaryComparison consistency check”</li>
+<li>“AND, OR, EqualTo, EqualNullSafe consistency check”</li>
+</ul>
+</li>
+<li>ConditionalExpressionSuite<ul>
+<li>“if”</li>
+</ul>
+</li>
+<li>RandomDataGeneratorSuite<ul>
+<li>“Basic types”</li>
+</ul>
+</li>
+<li>CastSuite<ul>
+<li>“null cast”</li>
+<li>“up-cast”</li>
+<li>“<a href="https://issues.apache.org/jira/browse/SPARK-27671">SPARK-27671</a>: cast from nested null type in struct”</li>
+</ul>
+</li>
+<li>OrderingSuite<ul>
+<li>“GenerateOrdering with DayTimeIntervalType”</li>
+<li>“GenerateOrdering with YearMonthIntervalType”</li>
+</ul>
+</li>
+<li>PredicateSuite<ul>
+<li>“IN with different types”</li>
+</ul>
+</li>
+<li>UnsafeRowSuite<ul>
+<li>“calling get(ordinal, datatype) on null columns”</li>
+</ul>
+</li>
+<li>SortSuite<ul>
+<li>“sorting on YearMonthIntervalType …”</li>
+<li>“sorting on DayTimeIntervalType …”</li>
+</ul>
+</li>
+</ol>
+<p>为了能够使<code>DayTimeIntervalType/YearMonthIntervalType</code>可以用于以上场景的测试</p>
+<ol>
+<li>在<code>DataTypeTestUtils.ordered</code>/<code>atomicTypes</code> 中增加<code>DayTimeIntervalType</code> 和<code>YearMonthIntervalType</code> </li>
+<li>在<code>LiteralGenerator</code>/<code>RandomDataGenerator</code>中增加了case，来生成<code>DayTimeIntervalType</code> 和<code>YearMonthIntervalType</code> 类型的数据</li>
+</ol>
+<h3 id="SPARK-34695"><a href="#SPARK-34695" class="headerlink" title="SPARK-34695"></a>SPARK-34695</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34695">SPARK-34695</a> Overflow in round trip conversion from micros to duration</p>
+<p>该SubTask的目标是解决micros和duration之间的转化产生溢出的问题</p>
+<p><a href="https://github.com/apache/spark/pull/31799">PR分析</a></p>
+<h3 id="SPARK-34715"><a href="#SPARK-34715" class="headerlink" title="SPARK-34715"></a>SPARK-34715</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34715">SPARK-34715</a> Add round trip tests for period &lt;-&gt; month and duration &lt;-&gt; micros</p>
+<p>该SubTask的目标是增加了测试</p>
+<ol>
+<li>period &lt;-&gt; month &lt;-&gt; period</li>
+<li>duration &lt;-&gt; micros  &lt;-&gt; duration </li>
+</ol>
+<p><a href="https://github.com/apache/spark/pull/32234">PR分析</a></p>
+<h3 id="SPARK-34718"><a href="#SPARK-34718" class="headerlink" title="SPARK-34718"></a>SPARK-34718</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34718">SPARK-34718</a> Assign pretty names to YearMonthIntervalType and DayTimeIntervalType</p>
+<p>该SubTask的目标是修改 <code>YearMonthIntervalType</code> 和 <code>DayTimeIntervalType</code> 的type name</p>
+<p><a href="https://github.com/apache/spark/pull/31810/">PR分析</a></p>
+<h3 id="SPARK-34793"><a href="#SPARK-34793" class="headerlink" title="SPARK-34793"></a>SPARK-34793</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34793">SPARK-34793</a> Prohibit saving of day-time and year-month intervals</p>
+<p><a href="https://github.com/apache/spark/pull/31884">PR分析</a></p>
+<h3 id="SPARK-34841"><a href="#SPARK-34841" class="headerlink" title="SPARK-34841"></a>SPARK-34841</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34841">SPARK-34841</a> Push ANSI interval binary expressions into into (if / case) branches</p>
+<p><a href="https://github.com/apache/spark/pull/31978">PR分析</a></p>
+<h3 id="SPARK-34878"><a href="#SPARK-34878" class="headerlink" title="SPARK-34878"></a>SPARK-34878</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34878">SPARK-34878</a> Test actual size of year-month and day-time intervals</p>
+<p><a href="https://github.com/apache/spark/pull/32366">PR分析</a></p>
+<h3 id="SPARK-34905"><a href="#SPARK-34905" class="headerlink" title="SPARK-34905"></a>SPARK-34905</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34905">SPARK-34905</a> Enable ANSI intervals in SQLQueryTestSuite</p>
+<p><a href="https://github.com/apache/spark/pull/32099">PR分析</a></p>
+<h3 id="SPARK-35018"><a href="#SPARK-35018" class="headerlink" title="SPARK-35018"></a>SPARK-35018</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35018">SPARK-35018</a> Test transferring year-month interval via Hive Thrift server</p>
+<p><a href="https://github.com/apache/spark/pull/32240">PR分析</a></p>
+<h3 id="SPARK-35085"><a href="#SPARK-35085" class="headerlink" title="SPARK-35085"></a>SPARK-35085</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35085">SPARK-35085</a> Get columns operation should handle ANSI interval column properly</p>
+<p>支持JDBC的客户端能够正确识别ANSI interval类型的列</p>
+<p><a href="https://github.com/apache/spark/pull/32345">PR分析</a></p>
+<h3 id="SPARK-35177"><a href="#SPARK-35177" class="headerlink" title="SPARK-35177"></a>SPARK-35177</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35177">SPARK-35177</a> IntervalUtils.fromYearMonthString can’t handle Int.MinValue correctly</p>
+<p><a href="https://github.com/apache/spark/pull/32281">PR分析</a></p>
+<h3 id="SPARK-35095"><a href="#SPARK-35095" class="headerlink" title="SPARK-35095"></a>SPARK-35095</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35095">SPARK-35095</a> Use ANSI intervals in streaming join tests</p>
+<h3 id="SPARK-35114"><a href="#SPARK-35114" class="headerlink" title="SPARK-35114"></a>SPARK-35114</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35114">SPARK-35114</a> Test ANSI interval literals</p>
+<p>在LiteralExpressionSuite中增加了对YearMonthIntervalType和DayTimeIntervalType的测试</p>
+<p><a href="https://github.com/apache/spark/pull/32213">PR分析</a></p>
+<h3 id="SPARK-35115"><a href="#SPARK-35115" class="headerlink" title="SPARK-35115"></a>SPARK-35115</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35115">SPARK-35115</a> Test ANSI intervals in MutableProjectionSuite</p>
+<p>在MutableProjectionSuite测试中增加了对YearMonthIntervalType和DayTimeIntervalType的测试</p>
+<p><a href="https://github.com/apache/spark/pull/32225">PR分析</a></p>
+<h3 id="SPARK-35116"><a href="#SPARK-35116" class="headerlink" title="SPARK-35116"></a>SPARK-35116</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35116">SPARK-35116</a> The generated data fits the precision of DayTimeIntervalType in spark</p>
+<p>该SubTask修改了RandomDataGenerator中生成DayTimeIntervalType类型数据的精度，在Spark中DayTimeIntervalType的精度使微妙，在java.time.Duration中精度使纳秒</p>
+<p><a href="https://github.com/apache/spark/pull/32212">PR分析</a></p>
+<h3 id="SPARK-35068"><a href="#SPARK-35068" class="headerlink" title="SPARK-35068"></a>SPARK-35068</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35068">SPARK-35068</a> Add tests for ANSI intervals to HiveThriftBinaryServerSuite</p>
+<p><a href="https://github.com/apache/spark/pull/32250">PR分析</a></p>
+<h3 id="SPARK-35130"><a href="#SPARK-35130" class="headerlink" title="SPARK-35130"></a>SPARK-35130</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35130">SPARK-35130</a> Construct day-time interval column from integral fields</p>
+<h3 id="SPARK-35169"><a href="#SPARK-35169" class="headerlink" title="SPARK-35169"></a>SPARK-35169</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35169">SPARK-35169</a> Wrong result of min ANSI interval division by -1</p>
+<p><a href="https://github.com/apache/spark/pull/32314">PR分析</a></p>
+<h3 id="SPARK-35187"><a href="#SPARK-35187" class="headerlink" title="SPARK-35187"></a>SPARK-35187</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35187">SPARK-35187</a> Failure on minimal interval literal</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">spark-sql&gt; SELECT INTERVAL &#39;-178956970-8&#39; YEAR TO MONTH;</span><br><span class="line">-178956970-8</span><br><span class="line"></span><br><span class="line">spark-sql&gt; SELECT INTERVAL -&#39;178956970-8&#39; YEAR TO MONTH;</span><br><span class="line">Error in query:</span><br><span class="line">Error parsing interval year-month string: integer overflow(line 1, pos 16)</span><br></pre></td></tr></table></figure>
+<p>处理符号位在Interval string外边的时候，产生异常的场景</p>
+<p><a href="https://github.com/apache/spark/pull/32296">PR分析</a></p>
+<ol>
+<li>AstBuilder.scala中处理了读取数据的逻辑</li>
+<li>在interval.sql中增加了测试case</li>
+</ol>
+<h3 id="SPARK-35228"><a href="#SPARK-35228" class="headerlink" title="SPARK-35228"></a>SPARK-35228</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35228">SPARK-35228</a> Add expression ToHiveString for keep consistent between hive/spark format in df.show and transform</p>
+<p>IN PROGRESS</p>
+<p><a href="https://github.com/apache/spark/pull/32365">PR分析</a></p>
+<h3 id="SPARK-35112"><a href="#SPARK-35112" class="headerlink" title="SPARK-35112"></a>SPARK-35112</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35112">SPARK-35112</a> Cast string to day-time interval</p>
+<p>该SubTask是<a href="https://issues.apache.org/jira/browse/SPARK-35111">SPARK-35111</a> 的补充</p>
+<p><a href="https://github.com/apache/spark/pull/32444">PR分析</a></p>
+<h3 id="SPARK-34984"><a href="#SPARK-34984" class="headerlink" title="SPARK-34984"></a>SPARK-34984</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-34984">SPARK-34984</a> ANSI intervals formatting in hive results</p>
+<p><a href="https://github.com/apache/spark/pull/32087">PR分析</a></p>
+<h3 id="SPARK-35016"><a href="#SPARK-35016" class="headerlink" title="SPARK-35016"></a>SPARK-35016</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35016">SPARK-35016</a> Format ANSI intervals in Hive style</p>
+<p><a href="https://github.com/apache/spark/pull/32120">PR分析</a></p>
+<h3 id="SPARK-35017"><a href="#SPARK-35017" class="headerlink" title="SPARK-35017"></a>SPARK-35017</h3><p><a href="https://issues.apache.org/jira/browse/SPARK-35017">SPARK-35017</a> Transfer ANSI intervals via Hive Thrift server</p>
+<p><a href="https://github.com/apache/spark/pull/32121">PR分析</a></p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>TODO</p>
+<h2 id="附录"><a href="#附录" class="headerlink" title="附录"></a>附录</h2><p>SQL standard for INTERVAL</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&lt;interval literal&gt; ::&#x3D;</span><br><span class="line">  INTERVAL [ &lt;sign&gt; ] &lt;interval string&gt; &lt;interval qualifier&gt;</span><br><span class="line"></span><br><span class="line">&lt;interval qualifier&gt; ::&#x3D;</span><br><span class="line">    &lt;start field&gt; TO &lt;end field&gt;</span><br><span class="line">  | &lt;single datetime field&gt;</span><br><span class="line">&lt;start field&gt; ::&#x3D;</span><br><span class="line">&lt;non-second primary datetime field&gt;</span><br><span class="line">      [ &lt;left paren&gt; &lt;interval leading field precision&gt; &lt;right paren&gt; ]</span><br><span class="line">&lt;end field&gt; ::&#x3D;</span><br><span class="line">&lt;non-second primary datetime field&gt;</span><br><span class="line">  | SECOND [ &lt;left paren&gt; &lt;interval fractional seconds precision&gt; &lt;right paren&gt; ]</span><br><span class="line">&lt;single datetime field&gt; ::&#x3D; &lt;non-second primary datetime field&gt;</span><br><span class="line">        [ &lt;left paren&gt; &lt;interval leading field precision&gt; &lt;right paren&gt; ]</span><br><span class="line">  | SECOND [ &lt;left paren&gt; &lt;interval leading field precision&gt;</span><br><span class="line">      [ &lt;comma&gt; &lt;interval fractional seconds precision&gt; ] &lt;right paren&gt; ]</span><br><span class="line">&lt;primary datetime field&gt; ::&#x3D; &lt;non-second primary datetime field&gt;</span><br><span class="line">| SECOND</span><br><span class="line">&lt;non-second primary datetime field&gt; ::&#x3D; YEAR</span><br><span class="line">  | MONTH</span><br><span class="line">  | DAY</span><br><span class="line">  | HOUR</span><br><span class="line">  | MINUTE</span><br><span class="line"></span><br><span class="line">&lt;interval string&gt; ::&#x3D;</span><br><span class="line">  &lt;quote&gt; &lt;unquoted interval string&gt; &lt;quote&gt;</span><br><span class="line">&lt;unquoted interval string&gt; ::&#x3D;</span><br><span class="line">[ &lt;sign&gt; ] &#123; &lt;year-month literal&gt; | &lt;day-time literal&gt; &#125;</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark SQL系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
       </tags>
   </entry>
 </search>
