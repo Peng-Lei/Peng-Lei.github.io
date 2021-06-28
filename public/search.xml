@@ -375,6 +375,88 @@
       </tags>
   </entry>
   <entry>
+    <title>Spark 内置函数</title>
+    <url>/2021/06/28/Spark/Spark-SQL-02/</url>
+    <content><![CDATA[<p>在数据库中，内置函数是一个很重要的模块儿，它实现了一些通用但又重要的功能，比如：求<code>abs()</code>,    <code>sum()</code>, <code>avg()</code>等，在Spark SQL中也是一样的，Spark SQL提供了300+的内置函数来满足用户来使用，同时还有UDF来满足更多的用户场景、用户的需求。</p>
+<a id="more"></a>
+
+<p>在<code>FunctionRegistry.scala</code>中，<code>expressions</code> 使用MAP保存了当前所有的内置函数</p>
+<p>注：最近想参与<code>Interval Type</code>的开发，在更多的内置函数中支持<code>Interval Type</code>类型可能是下一阶段的开发重点。尤其是<code>WIDTH_BUCKET</code>函数，个人理解它更应该支持<code>Interval Type</code>，比如统计持续时间的直方图</p>
+<h2 id="内置函数"><a href="#内置函数" class="headerlink" title="内置函数"></a>内置函数</h2><h3 id="内置函数分类"><a href="#内置函数分类" class="headerlink" title="内置函数分类"></a>内置函数分类</h3><p>Spark SQL中内置函数大致分为：聚合函数、集合函数、日期函数、数学函数、混合函数、非聚合函数、排序函数、字符串函数、窗口函数、UDF函数等。</p>
+<h3 id="内置函数使用"><a href="#内置函数使用" class="headerlink" title="内置函数使用"></a>内置函数使用</h3><p>假设有如下表和数据，使用lower内置函数</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>age</th>
+<th>phone</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>小明</td>
+<td>18</td>
+<td>1231231231</td>
+</tr>
+<tr>
+<td>小红</td>
+<td>19</td>
+<td>1231231232</td>
+</tr>
+</tbody></table>
+<ul>
+<li><p>通过编程方式使用</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">import org.apache.spark.sql.functions._</span><br><span class="line">df.select(lower(col(&quot;name&quot;)).as(&quot;name&quot;), col(&quot;age&quot;), col(&quot;phone&quot;)).show()</span><br></pre></td></tr></table></figure></li>
+<li><p>通过SQL来使用</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">spark.sql(&quot;select lower(name) as name,age,phone from people&quot;).show()</span><br></pre></td></tr></table></figure>
+
+
+
+
+</li>
+</ul>
+<h2 id="如何实现内置函数"><a href="#如何实现内置函数" class="headerlink" title="如何实现内置函数"></a>如何实现内置函数</h2><p>以<a href="https://github.com/apache/spark/pull/28764">SPARK-21117</a>为例：</p>
+<ol>
+<li><p>首先肯定是根据ANSI SQL去了解内置函数的行为</p>
+</li>
+<li><p>其次根据<code>function</code>的是实现的功能划分到对应的函数分类中，比如<code>width-buckets</code>就属于<code>math</code>类的函数</p>
+</li>
+<li><p>定义对应case class</p>
+<ul>
+<li><p>根据参数个数选择继承对应的表达式，比如<code>WidthBucket</code>根据SQL的描述一共会有4个输入参数，所以继承了<code>QuaternaryExpression</code></p>
+</li>
+<li><p>定义输入输出类型</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">override def inputTypes: Seq[AbstractDataType] &#x3D; Seq(DoubleType, DoubleType, DoubleType, LongType)</span><br><span class="line">override def dataType: DataType &#x3D; LongType</span><br></pre></td></tr></table></figure></li>
+<li><p>重写求值方法</p>
+</li>
+<li><p>重写<code>doGenCode</code>方法</p>
+</li>
+<li><p>重写<code>withNewChildrenInternal</code>方法</p>
+</li>
+</ul>
+</li>
+<li><p>定义对应Object</p>
+<p>在Object中定义求值方法</p>
+</li>
+<li><p>在<code>FunctionRegistry.scala</code>中注册该内置函数</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">expression[WidthBucket](&quot;width_bucket&quot;)</span><br></pre></td></tr></table></figure></li>
+<li><p>补充测试用例</p>
+</li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p><code>WIDTH_BUCKET</code>是在统计用的比较多的一个函数，它用于求一个<code>value</code>落在一个区间范围内的<code>buckets</code>中的某个<code>bucket</code>的编号。</p>
+<p>目前Spark中的实现是支持double，返回long，其他数据类型可以通过Cast来转换使用，但是，我觉得像<code>DateType</code>、<code>Interval Type</code>更需要在<code>WIDTH_BUCKET</code>中支持，而且其他传统DB中的<code>WIDTH_BUCKET</code>支持的数据类型本身就比较多。</p>
+<p>两个例子：</p>
+<p>1、统计80后、90后、00后、10后的人数直方图，这个时候birthday就是DateType</p>
+<p>2、统计任务持续时间为1天、2天、…的直方图，这个时候任务的持续时间是用Interval Type来表示的</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
+]]></content>
+      <categories>
+        <category>Spark SQL 开发系列</category>
+      </categories>
+      <tags>
+        <tag>spark</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>SparkSession</title>
     <url>/2021/03/23/Spark/Spark%E5%9F%BA%E7%A1%80-1/</url>
     <content><![CDATA[<p>从Spark2.0开始，Spark提供了新的统一的入口点SparkSession来使用Spark的各项功能，SparkSession封装了SparkConf、SparkContext、SQLContext、HiveContext等。</p>
@@ -994,7 +1076,7 @@
   </entry>
   <entry>
     <title>Support ANSI SQL INTERVAL TYPES[SPARK-27790]</title>
-    <url>/2021/05/19/Spark/Spark-SQL-1/</url>
+    <url>/2021/05/19/Spark/Spark-SQL-01/</url>
     <content><![CDATA[<p><a href="https://issues.apache.org/jira/browse/SPARK-27790">SPARK-27790</a> Support ANSI SQL INTERVAL Types</p>
 <p>本文主要对Spark SQL中添加ANSI SQL INTERVAL 类型的背景、开发过程、代码做了简单的梳理总结，目前分析还不够深入，因为我只是学习了各个PR的代码。相比每个PR的代码来说，PR的评论、Review意见是更值得深入思考的地方，这个还是需要一定的时间消化。</p>
 <p>未完待续，持续更新</p>

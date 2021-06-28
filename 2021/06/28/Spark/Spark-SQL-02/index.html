@@ -21,30 +21,33 @@
     var CONFIG = {"hostname":"www.mobanche.top","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"./public/search.xml"};
   </script>
 
-  <meta name="description" content="壁立千仞.无欲则刚">
-<meta property="og:type" content="website">
-<meta property="og:title" content="末班车">
-<meta property="og:url" content="http://www.mobanche.top/page/3/index.html">
+  <meta name="description" content="在数据库中，内置函数是一个很重要的模块儿，它实现了一些通用但又重要的功能，比如：求abs(),    sum(), avg()等，在Spark SQL中也是一样的，Spark SQL提供了300+的内置函数来满足用户来使用，同时还有UDF来满足更多的用户场景、用户的需求。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark 内置函数">
+<meta property="og:url" content="http://www.mobanche.top/2021/06/28/Spark/Spark-SQL-02/index.html">
 <meta property="og:site_name" content="末班车">
-<meta property="og:description" content="壁立千仞.无欲则刚">
+<meta property="og:description" content="在数据库中，内置函数是一个很重要的模块儿，它实现了一些通用但又重要的功能，比如：求abs(),    sum(), avg()等，在Spark SQL中也是一样的，Spark SQL提供了300+的内置函数来满足用户来使用，同时还有UDF来满足更多的用户场景、用户的需求。">
 <meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2021-06-28T01:42:34.600Z">
+<meta property="article:modified_time" content="2021-06-28T09:45:06.420Z">
 <meta property="article:author" content="Peng Lei">
+<meta property="article:tag" content="spark">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="http://www.mobanche.top/page/3/">
+<link rel="canonical" href="http://www.mobanche.top/2021/06/28/Spark/Spark-SQL-02/">
 
 
 <script id="page-configurations">
   // https://hexo.io/docs/variables.html
   CONFIG.page = {
     sidebar: "",
-    isHome : true,
-    isPost : false,
+    isHome : false,
+    isPost : true,
     lang   : 'zh-CN'
   };
 </script>
 
-  <title>末班车</title>
+  <title>Spark 内置函数 | 末班车</title>
   
 
 
@@ -185,13 +188,14 @@
         <div class="content-wrap">
           
 
-          <div class="content index posts-expand">
+          <div class="content post posts-expand">
             
-      
+
+    
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-2/">
+    <link itemprop="mainEntityOfPage" href="http://www.mobanche.top/2021/06/28/Spark/Spark-SQL-02/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/me.jpg">
@@ -203,10 +207,9 @@
       <meta itemprop="name" content="末班车">
     </span>
       <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/03/23/Spark/Spark-On-K8S-2/" class="post-title-link" itemprop="url">Spark on K8S Submit分析</a>
-        </h2>
+        <h1 class="post-title" itemprop="name headline">
+          Spark 内置函数
+        </h1>
 
         <div class="post-meta">
             <span class="post-meta-item">
@@ -216,7 +219,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2021-03-23 14:15:57 / 修改时间：15:20:17" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
+              <time title="创建时间：2021-06-28 09:42:34 / 修改时间：17:45:06" itemprop="dateCreated datePublished" datetime="2021-06-28T09:42:34+08:00">2021-06-28</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -224,24 +227,31 @@
               </span>
               <span class="post-meta-item-text">分类于</span>
                 <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Spark-On-K8S%E7%B3%BB%E5%88%97/" itemprop="url" rel="index"><span itemprop="name">Spark On K8S系列</span></a>
+                  <a href="/categories/Spark-SQL-%E5%BC%80%E5%8F%91%E7%B3%BB%E5%88%97/" itemprop="url" rel="index"><span itemprop="name">Spark SQL 开发系列</span></a>
                 </span>
             </span>
 
-          <br>
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
             <span class="post-meta-item" title="本文字数">
               <span class="post-meta-item-icon">
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>2.5k</span>
+              <span>1.5k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -253,217 +263,132 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>Spark已经集成了Kuburnetes资源管理框架，集成的方式是在Spark中启动一个客户端跟K8S的ApiServer进行通信，申请和释放资源来运行Driver和Executor。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/03/23/Spark/Spark-On-K8S-2/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
+        <p>在数据库中，内置函数是一个很重要的模块儿，它实现了一些通用但又重要的功能，比如：求<code>abs()</code>,    <code>sum()</code>, <code>avg()</code>等，在Spark SQL中也是一样的，Spark SQL提供了300+的内置函数来满足用户来使用，同时还有UDF来满足更多的用户场景、用户的需求。</p>
+<a id="more"></a>
+
+<p>在<code>FunctionRegistry.scala</code>中，<code>expressions</code> 使用MAP保存了当前所有的内置函数</p>
+<p>注：最近想参与<code>Interval Type</code>的开发，在更多的内置函数中支持<code>Interval Type</code>类型可能是下一阶段的开发重点。尤其是<code>WIDTH_BUCKET</code>函数，个人理解它更应该支持<code>Interval Type</code>，比如统计持续时间的直方图</p>
+<h2 id="内置函数"><a href="#内置函数" class="headerlink" title="内置函数"></a>内置函数</h2><h3 id="内置函数分类"><a href="#内置函数分类" class="headerlink" title="内置函数分类"></a>内置函数分类</h3><p>Spark SQL中内置函数大致分为：聚合函数、集合函数、日期函数、数学函数、混合函数、非聚合函数、排序函数、字符串函数、窗口函数、UDF函数等。</p>
+<h3 id="内置函数使用"><a href="#内置函数使用" class="headerlink" title="内置函数使用"></a>内置函数使用</h3><p>假设有如下表和数据，使用lower内置函数</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>age</th>
+<th>phone</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>小明</td>
+<td>18</td>
+<td>1231231231</td>
+</tr>
+<tr>
+<td>小红</td>
+<td>19</td>
+<td>1231231232</td>
+</tr>
+</tbody></table>
+<ul>
+<li><p>通过编程方式使用</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">import org.apache.spark.sql.functions._</span><br><span class="line">df.select(lower(col(&quot;name&quot;)).as(&quot;name&quot;), col(&quot;age&quot;), col(&quot;phone&quot;)).show()</span><br></pre></td></tr></table></figure></li>
+<li><p>通过SQL来使用</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">spark.sql(&quot;select lower(name) as name,age,phone from people&quot;).show()</span><br></pre></td></tr></table></figure>
+
+
+
+
+</li>
+</ul>
+<h2 id="如何实现内置函数"><a href="#如何实现内置函数" class="headerlink" title="如何实现内置函数"></a>如何实现内置函数</h2><p>以<a target="_blank" rel="noopener" href="https://github.com/apache/spark/pull/28764">SPARK-21117</a>为例：</p>
+<ol>
+<li><p>首先肯定是根据ANSI SQL去了解内置函数的行为</p>
+</li>
+<li><p>其次根据<code>function</code>的是实现的功能划分到对应的函数分类中，比如<code>width-buckets</code>就属于<code>math</code>类的函数</p>
+</li>
+<li><p>定义对应case class</p>
+<ul>
+<li><p>根据参数个数选择继承对应的表达式，比如<code>WidthBucket</code>根据SQL的描述一共会有4个输入参数，所以继承了<code>QuaternaryExpression</code></p>
+</li>
+<li><p>定义输入输出类型</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">override def inputTypes: Seq[AbstractDataType] &#x3D; Seq(DoubleType, DoubleType, DoubleType, LongType)</span><br><span class="line">override def dataType: DataType &#x3D; LongType</span><br></pre></td></tr></table></figure></li>
+<li><p>重写求值方法</p>
+</li>
+<li><p>重写<code>doGenCode</code>方法</p>
+</li>
+<li><p>重写<code>withNewChildrenInternal</code>方法</p>
+</li>
+</ul>
+</li>
+<li><p>定义对应Object</p>
+<p>在Object中定义求值方法</p>
+</li>
+<li><p>在<code>FunctionRegistry.scala</code>中注册该内置函数</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">expression[WidthBucket](&quot;width_bucket&quot;)</span><br></pre></td></tr></table></figure></li>
+<li><p>补充测试用例</p>
+</li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p><code>WIDTH_BUCKET</code>是在统计用的比较多的一个函数，它用于求一个<code>value</code>落在一个区间范围内的<code>buckets</code>中的某个<code>bucket</code>的编号。</p>
+<p>目前Spark中的实现是支持double，返回long，其他数据类型可以通过Cast来转换使用，但是，我觉得像<code>DateType</code>、<code>Interval Type</code>更需要在<code>WIDTH_BUCKET</code>中支持，而且其他传统DB中的<code>WIDTH_BUCKET</code>支持的数据类型本身就比较多。</p>
+<p>两个例子：</p>
+<p>1、统计80后、90后、00后、10后的人数直方图，这个时候birthday就是DateType</p>
+<p>2、统计任务持续时间为1天、2天、…的直方图，这个时候任务的持续时间是用Interval Type来表示的</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a target="_blank" rel="noopener" href="https://github.com/apache/spark">Spark代码</a></p>
+
     </div>
 
     
     
     
+        <div class="reward-container">
+  <div>您的支持将鼓励我继续创作.</div>
+  <button onclick="var qr = document.getElementById('qr'); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
+    打赏
+  </button>
+  <div id="qr" style="display: none;">
+      
+      <div style="display: inline-block;">
+        <img src="/images/pay/01.jpg" alt="Peng Lei 微信支付">
+        <p>微信支付</p>
+      </div>
+      
+      <div style="display: inline-block;">
+        <img src="/images/pay/02.jpg" alt="Peng Lei 支付宝">
+        <p>支付宝</p>
+      </div>
+
+  </div>
+</div>
+
+
       <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
+          <div class="post-tags">
+              <a href="/tags/spark/" rel="tag"># spark</a>
+          </div>
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-3/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/me.jpg">
-      <meta itemprop="name" content="Peng Lei">
-      <meta itemprop="description" content="壁立千仞.无欲则刚">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="末班车">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/03/23/Spark/Spark-On-K8S-3/" class="post-title-link" itemprop="url">Spark on K8S Feature分析</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2021-03-23 14:15:57 / 修改时间：15:20:25" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Spark-On-K8S%E7%B3%BB%E5%88%97/" itemprop="url" rel="index"><span itemprop="name">Spark On K8S系列</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>3.6k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在Spark App的执行过程中，有两种进程：Driver和Executor，这两种进程都会运行在K8S的Pod中，那么Driver和Executor运行的Pod环境是什么样的呢？又是如何定义呢？这就是feature包的作用了。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/03/23/Spark/Spark-On-K8S-3/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
         
-      
-    </div>
 
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://www.mobanche.top/2021/03/23/Spark/Spark-On-K8S-1/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/me.jpg">
-      <meta itemprop="name" content="Peng Lei">
-      <meta itemprop="description" content="壁立千仞.无欲则刚">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="末班车">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/03/23/Spark/Spark-On-K8S-1/" class="post-title-link" itemprop="url">Spark on K8S</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2021-03-23 14:15:57 / 修改时间：18:30:23" itemprop="dateCreated datePublished" datetime="2021-03-23T14:15:57+08:00">2021-03-23</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Spark-On-K8S%E7%B3%BB%E5%88%97/" itemprop="url" rel="index"><span itemprop="name">Spark On K8S系列</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>2.8k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/03/23/Spark/Spark-On-K8S-1/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
         
-      
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/05/19/Spark/Spark-SQL-01/" rel="prev" title="Support ANSI SQL INTERVAL TYPES[SPARK-27790]">
+      <i class="fa fa-chevron-left"></i> Support ANSI SQL INTERVAL TYPES[SPARK-27790]
+    </a></div>
+      <div class="post-nav-item"></div>
     </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
       </footer>
+    
   </article>
   
   
   
-
-
-  
-  <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span>
-  </nav>
 
 
 
           </div>
           
+    <div class="comments" id="gitalk-container"></div>
 
 <script>
   window.addEventListener('tabs:register', () => {
@@ -510,6 +435,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E7%BD%AE%E5%87%BD%E6%95%B0"><span class="nav-number">1.</span> <span class="nav-text">内置函数</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E7%BD%AE%E5%87%BD%E6%95%B0%E5%88%86%E7%B1%BB"><span class="nav-number">1.1.</span> <span class="nav-text">内置函数分类</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E7%BD%AE%E5%87%BD%E6%95%B0%E4%BD%BF%E7%94%A8"><span class="nav-number">1.2.</span> <span class="nav-text">内置函数使用</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%86%85%E7%BD%AE%E5%87%BD%E6%95%B0"><span class="nav-number">2.</span> <span class="nav-text">如何实现内置函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">4.</span> <span class="nav-text">参考</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -691,6 +617,25 @@
 
   
 
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '566a3c91fad003b56198',
+      clientSecret: '347cd7479fcc953935f228ecdf3c6af447e51793',
+      repo        : 'Comments',
+      owner       : 'Peng-Lei',
+      admin       : ['Peng-Lei'],
+      id          : '1ff42580c86c232c5e6f56fb50788972',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
 
 </body>
 </html>
