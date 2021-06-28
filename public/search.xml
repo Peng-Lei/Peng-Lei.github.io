@@ -382,6 +382,7 @@
 
 <p>在<code>FunctionRegistry.scala</code>中，<code>expressions</code> 使用MAP保存了当前所有的内置函数</p>
 <p>注：最近想参与<code>Interval Type</code>的开发，在更多的内置函数中支持<code>Interval Type</code>类型可能是下一阶段的开发重点。尤其是<code>WIDTH_BUCKET</code>函数，个人理解它更应该支持<code>Interval Type</code>，比如统计持续时间的直方图</p>
+<p>目前在Interval Type上已经支持<a href="https://issues.apache.org/jira/browse/SPARK-34716">Sum</a>、<a href="https://issues.apache.org/jira/browse/SPARK-34837">Avg</a>，其实function是否需要支持Interval Type？</p>
 <h2 id="内置函数"><a href="#内置函数" class="headerlink" title="内置函数"></a>内置函数</h2><h3 id="内置函数分类"><a href="#内置函数分类" class="headerlink" title="内置函数分类"></a>内置函数分类</h3><p>Spark SQL中内置函数大致分为：聚合函数、集合函数、日期函数、数学函数、混合函数、非聚合函数、排序函数、字符串函数、窗口函数、UDF函数等。</p>
 <h3 id="内置函数使用"><a href="#内置函数使用" class="headerlink" title="内置函数使用"></a>内置函数使用</h3><p>假设有如下表和数据，使用lower内置函数</p>
 <table>
@@ -450,7 +451,7 @@
 <h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/apache/spark">Spark代码</a></p>
 ]]></content>
       <categories>
-        <category>Spark SQL 开发系列</category>
+        <category>Spark SQL 系列</category>
       </categories>
       <tags>
         <tag>spark</tag>
